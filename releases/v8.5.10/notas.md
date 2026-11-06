@@ -1,0 +1,5 @@
+- 💬 Chat entre las dos apps (botón 💬 arriba), con aviso aunque la app esté cerrada
+- 🔑 Varias claves de IA: cuando una se agota, la app pasa sola a la siguiente
+- ⧉ Ventana flotante: deja el descanso encima de otras apps (Ajustes o el botón en el entreno; en Android 12+ entra sola al salir durante un entreno)
+- 📲 Compartir la app: enlace a Mi Progreso Libre, la versión pública que no se conecta con nuestras apps
+- 💡 (Jaider) Aviso dentro de la app cuando Ella pide cambios

@@ -10,18 +10,21 @@ import android.view.KeyEvent;
  *  - "__media__"      : controla la música que esté sonando en el teléfono (Spotify, YouTube Music…)
  *                       valor: "toggle" | "next" | "prev" | "play" | "pause" | "active" (¿suena algo?)
  *  - "__widget_pin__" : con valor "q:<tipo>" pide a Android fijar un widget de acceso rápido.
+ *  - "__pip__" (8.5.0): ventana flotante (picture-in-picture). Valores en Pip.java:
+ *                       "supported" | "enter" | "enter:9:16" | "auto:1" | "auto:0" | "active".
  */
 public final class Ext2 {
     private Ext2() { }
 
     public static boolean handles(String key, String value) {
-        if ("__media__".equals(key)) return true;
+        if ("__media__".equals(key) || "__pip__".equals(key)) return true;
         return "__widget_pin__".equals(key) && value != null && value.startsWith("q:");
     }
 
     public static boolean hook(Context ctx, String key, String value) {
         try {
             if ("__media__".equals(key)) return media(ctx, value);
+            if ("__pip__".equals(key)) return Pip.handle(ctx, value);
             if ("__widget_pin__".equals(key)) return QuickWidget.requestPin(ctx, value.substring(2));
         } catch (Throwable ignored) { }
         return false;

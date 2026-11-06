@@ -1,5 +1,5 @@
 // ============================================================================
-// BACKEND MI PROGRESO v14 — Google Apps Script (respaldo en Drive + app de Ella)
+// BACKEND MI PROGRESO v15 — Google Apps Script (respaldo en Drive + app de Ella)
 // ============================================================================
 // NOVEDAD v12 — DATOS POR USUARIO:
 //   La app de Ella (8.4.13+) manda app:'ella' en cada llamada. Con eso el backend sabe
@@ -14,6 +14,11 @@
 // ============================================================================
 // Carpeta "Mi Progreso v8.0":
 // https://drive.google.com/drive/folders/1hUkPHwACKs533vFBA0_D4VymitggIXKD
+//
+// v15: varias claves de Groq (GROQ_API_KEY, GROQ_API_KEY_2, GROQ_API_KEY_3… o GROQ_API_KEYS
+//      separadas por comas): verify_code devuelve groqKeys y las apps pasan a la siguiente cuando
+//      una se agota. Chat entre las dos apps (chat_send / chat_list / chat_read) con aviso aunque la
+//      app esté cerrada (pending_notifications).
 //
 // v14: pedidos de cambios para la app de Ella (send_request / get_requests / update_request /
 //      delete_request). Ella anota lo que quiere que cambie y Jaider lo ve y lo marca.
@@ -31,7 +36,7 @@
 // 4. Debe seguir con: Ejecutar como "Yo" · Quién tiene acceso "Cualquier persona".
 //
 // ACCIONES (POST con cuerpo JSON, o GET con ?action=...):
-//   verify_code    { code }                       -> { ok, role, groqKey }
+//   verify_code    { code }                       -> { ok, role, groqKey, groqKeys:[...] }
 //   sync_her_data  { code, payload }              -> guarda progreso_ella.json        (Ella o admin)
 //   get_messages   { code, includeRead? }         -> mensajes pendientes / todos       (Ella o admin)
 //   mark_read      { code, ids:[...] }            -> marca mensajes como leídos        (Ella o admin)
@@ -53,6 +58,11 @@
 //   get_requests   { code, app? }                 -> pedidos (Ella: los suyos; Jaider: todos)
 //   update_request { code, id, status, note }     -> Jaider marca un pedido             (solo admin)
 //   delete_request { code, app?, id }             -> borra un pedido (Ella los suyos; admin cualquiera)
+//   chat_send      { code, app?, thread?, id, text } -> manda un mensaje al chat        (Ella o admin)
+//   chat_list      { code, app?, thread?, since? }   -> mensajes del chat y no leídos   (Ella o admin)
+//   chat_read      { code, app?, thread?, upTo? }    -> marca el chat como leído        (Ella o admin)
+//     · App de Ella con su código -> chat "ella"; con el código admin (prueba) -> chat "prueba".
+//     · App de Jaider -> chat "ella" (o thread:'prueba' para ver el de prueba).
 //   backup / sin action -> respaldo clásico (igual que antes)
 //   (Con app:'ella' + código admin, las acciones de Ella usan el usuario "prueba".)
 // ============================================================================
@@ -60,6 +70,8 @@
 // ---------- CLAVES PRIVADAS (nunca en el APK ni en el código) ----------
 // Se guardan en Apps Script → ⚙️ Configuración del proyecto → Propiedades del script:
 //   CODIGO_ELLA, CODIGO_ADMIN, GROQ_API_KEY
+//   y, si quieres claves de reserva: GROQ_API_KEY_2, GROQ_API_KEY_3 … (hasta _9)
+//   o GROQ_API_KEYS con varias separadas por comas.
 // Así el código se puede actualizar automáticamente desde GitHub sin borrar las claves.
 // (Si alguna propiedad falta, se usa el valor de respaldo de aquí abajo.)
 function prop_(k, respaldo) {
@@ -69,7 +81,21 @@ function prop_(k, respaldo) {
 const CODIGO_ELLA  = prop_('CODIGO_ELLA',  "TU_CODIGO_SECRETO_AQUI");
 const CODIGO_ADMIN = prop_('CODIGO_ADMIN', "TU_CODIGO_ADMIN");
 const GROQ_API_KEY = prop_('GROQ_API_KEY', "TU_API_KEY_DE_GROQ");
-const BACKEND_VERSION = 'v14';
+const BACKEND_VERSION = 'v15';
+// Todas las claves de Groq configuradas, sin repetir y en orden (la principal primero).
+function groqKeys_() {
+  const out = [];
+  const add = function (v) {
+    String(v || '').split(/[\s,;]+/).forEach(function (k) {
+      k = k.trim();
+      if (/^gsk_[A-Za-z0-9]{10,}$/.test(k) && out.indexOf(k) < 0) out.push(k);
+    });
+  };
+  add(GROQ_API_KEY);
+  for (let i = 2; i <= 9; i++) add(prop_('GROQ_API_KEY_' + i, ''));
+  add(prop_('GROQ_API_KEYS', ''));
+  return out;
+}
 function clavesConfiguradas_() {
   return CODIGO_ELLA !== "TU_CODIGO_SECRETO_AQUI" && CODIGO_ADMIN !== "TU_CODIGO_ADMIN";
 }
@@ -258,13 +284,51 @@ function saveRequests(folder, list) {
 }
 
 // ============================================================================
+// Chat entre las dos apps (v15)
+// ============================================================================
+const CHAT_FILE = 'chat_mi_progreso.json';
+const MAX_CHAT = 400;
+const MAX_TEXTO_CHAT = 1000;
+
+function loadChat(folder) {
+  const f = findFile(folder, CHAT_FILE);
+  const d = f ? readJsonFile(f) : null;
+  const threads = (d && d.threads && typeof d.threads === 'object') ? d.threads : {};
+  return { threads: threads };
+}
+
+function saveChat(folder, chat) {
+  upsertFile(folder, CHAT_FILE, JSON.stringify({ updatedAt: new Date().toISOString(), threads: chat.threads }, null, 2));
+}
+
+function chatThread(chat, name) {
+  const t = chat.threads[name] = chat.threads[name] || {};
+  if (!Array.isArray(t.messages)) t.messages = [];
+  t.read = t.read || {};
+  return t;
+}
+
+// Quién escribe y en qué conversación: { side: 'jaider'|'ella', other, thread: 'ella'|'prueba' }
+function chatWho(body, role) {
+  if (fromHerApp(body)) return { side: 'ella', other: 'jaider', thread: userOf(body, role) };
+  if (role !== 'admin') throw new Error('Código inválido o faltante');
+  return { side: 'jaider', other: 'ella', thread: String(body.thread || '') === 'prueba' ? 'prueba' : 'ella' };
+}
+
+function chatUnread(t, side) {
+  const seen = Number(t.read[side]) || 0;
+  return t.messages.filter(function (m) { return m.from !== side && Number(m.ts) > seen; });
+}
+
+// ============================================================================
 // Acciones
 // ============================================================================
 const ACTIONS = {
   verify_code: function (body) {
     const role = roleOf(body.code);
     if (!role) return { ok: false, error: 'Código inválido' };
-    return { ok: true, role: role, user: userOf(body, role), groqKey: GROQ_API_KEY };
+    const keys = groqKeys_();
+    return { ok: true, role: role, user: userOf(body, role), groqKey: keys[0] || GROQ_API_KEY, groqKeys: keys };
   },
 
   sync_her_data: function (body, folder) {
@@ -591,9 +655,55 @@ const ACTIONS = {
     return { ok: false, error: 'Foto no encontrada' };
   },
 
+  chat_send: function (body, folder) {
+    const w = chatWho(body, requireRole(body, 'any'));
+    const text = String(body.text || '').trim().slice(0, MAX_TEXTO_CHAT);
+    if (!text) throw new Error('El mensaje está vacío');
+    const id = String(body.id || Utilities.getUuid()).replace(/[^a-zA-Z0-9_-]/g, '').slice(0, 64) || Utilities.getUuid();
+    let saved = null;
+    withLock(function () {
+      const chat = loadChat(folder), t = chatThread(chat, w.thread);
+      saved = t.messages.filter(function (m) { return m.id === id; })[0] || null;
+      if (saved) return;                                   // reintento de un envío que ya llegó
+      const last = t.messages.length ? Number(t.messages[t.messages.length - 1].ts) || 0 : 0;
+      saved = { id: id, from: w.side, text: text, ts: Math.max(Date.now(), last + 1) };
+      t.messages.push(saved);
+      if (t.messages.length > MAX_CHAT) t.messages = t.messages.slice(t.messages.length - MAX_CHAT);
+      t.read[w.side] = saved.ts;                            // lo mío cuenta como leído
+      saveChat(folder, chat);
+    });
+    return { ok: true, thread: w.thread, message: saved };
+  },
+
+  chat_list: function (body, folder) {
+    const w = chatWho(body, requireRole(body, 'any'));
+    const t = chatThread(loadChat(folder), w.thread);
+    const since = Number(body.since) || 0;
+    const list = t.messages.filter(function (m) { return Number(m.ts) > since; }).slice(-200);
+    return {
+      ok: true, thread: w.thread, me: w.side, messages: list,
+      unread: chatUnread(t, w.side).length,
+      readByOther: Number(t.read[w.other]) || 0,
+      readByMe: Number(t.read[w.side]) || 0
+    };
+  },
+
+  chat_read: function (body, folder) {
+    const w = chatWho(body, requireRole(body, 'any'));
+    let at = 0;
+    withLock(function () {
+      const chat = loadChat(folder), t = chatThread(chat, w.thread);
+      const lastTs = t.messages.length ? Number(t.messages[t.messages.length - 1].ts) || 0 : 0;
+      const upTo = Math.min(Number(body.upTo) || lastTs, lastTs);
+      at = Math.max(Number(t.read[w.side]) || 0, upTo);
+      if (at !== (Number(t.read[w.side]) || 0)) { t.read[w.side] = at; saveChat(folder, chat); }
+    });
+    return { ok: true, readAt: at };
+  },
+
   // Comprobación para la automatización de GitHub (no revela ninguna clave).
   health: function () {
-    return { ok: true, version: BACKEND_VERSION, clavesConfiguradas: clavesConfiguradas_() };
+    return { ok: true, version: BACKEND_VERSION, clavesConfiguradas: clavesConfiguradas_(), clavesIA: groqKeys_().length };
   },
 
   // Novedades para notificar con la app cerrada (la app consulta cada ~15 min).
@@ -618,6 +728,10 @@ const ACTIONS = {
         const t = q.status === 'hecho' ? '✅ Tu pedido para la app está listo' : q.status === 'en_proceso' ? '🛠 Jaider está trabajando en tu pedido' : '💡 Jaider revisó tu pedido';
         items.push({ id: 'ped:' + q.id + ':' + q.status, title: t, text: q.text + (q.note ? ' · ' + q.note : ''), action: 'go:requests' });
       });
+      chatUnread(chatThread(loadChat(folder), userOf(body, role)), 'ella').forEach(function (m) {
+        if (Date.now() - Number(m.ts) > 36 * 3600000) return;
+        items.push({ id: 'chat:' + m.id, title: '💬 Jaider', text: m.text, action: 'go:chat', button: 'Responder' });
+      });
     } else if (role === 'admin') {
       loadMessages(folder).forEach(function (m) {
         const r = m.reply;
@@ -628,6 +742,13 @@ const ACTIONS = {
         if ((q.user || 'ella') !== 'ella' || q.status !== 'pendiente') return;
         if (Date.now() - Number(q.createdAt || 0) > 36 * 3600000) return;
         items.push({ id: 'ped:' + q.id, title: '💡 Ella pidió un cambio para su app', text: q.text, action: 'go:requests' });
+      });
+      const chat = loadChat(folder);
+      ['ella', 'prueba'].forEach(function (th) {
+        chatUnread(chatThread(chat, th), 'jaider').forEach(function (m) {
+          if (Date.now() - Number(m.ts) > 36 * 3600000) return;
+          items.push({ id: 'chat:' + m.id, title: th === 'prueba' ? '💬 Chat (prueba)' : '💬 Ella', text: m.text, action: th === 'prueba' ? 'go:chat:prueba' : 'go:chat', button: 'Responder' });
+        });
       });
       const hf = newestFile(folder, [HER_FILE].concat(HER_LEGACY_FILES));
       if (hf && Date.now() - hf.getLastUpdated().getTime() < 36 * 3600000) {
@@ -706,4 +827,6 @@ function probarConfiguracion() {
   Logger.log('progreso_prueba.json: ' + (findFile(folder, USUARIOS.prueba.file) ? 'sí' : 'aún no'));
   Logger.log('Pedidos de la app de Ella: ' + loadRequests(folder).length);
   Logger.log('Códigos configurados: ' + clavesConfiguradas_());
+  Logger.log('Claves de IA configuradas: ' + groqKeys_().length);
+  Logger.log('Mensajes en el chat: ' + (chatThread(loadChat(folder), 'ella').messages.length));
 }

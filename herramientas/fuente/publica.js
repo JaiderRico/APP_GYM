@@ -1,0 +1,196 @@
+  /* ===================== Mi Progreso Libre: versión pública, sin conexión con nuestras apps ===================== */
+  // Se genera con "python3 herramientas/mp.py libre X.Y.Z" a partir de la app de Jaider:
+  // todo se guarda solo en el teléfono, sin IA, sin nube, sin chat y sin el backend de Apps Script.
+  const PUB_PRO_TXT='Las funciones Pro (entrenador con IA, copia en la nube y chat) son de pago. Si las quieres, pídele el acceso a quien te compartió la app.';
+  document.head.insertAdjacentHTML('beforeend',`<style id="pubcss">
+    #hmEntry,#v85ChatBtn,.pv-tabs,#backupDriveCard,#cloudCard,[data-hm-open],[data-partner-open]{display:none!important}
+    .pub-gate{position:fixed;inset:0;z-index:9500;background:var(--bg);overflow-y:auto;display:flex;align-items:flex-start;justify-content:center;padding:calc(env(safe-area-inset-top,0px) + 28px) 18px 28px}
+    .pub-card{width:min(440px,100%);background:var(--panel);border:1px solid var(--line);border-radius:24px;padding:24px 20px;margin:auto 0}
+    .pub-card h1{margin:4px 0 6px;font-size:23px;line-height:1.2}.pub-card p{margin:0 0 14px;color:var(--muted);font-size:15px}
+    .pub-q{font-size:40px}
+    .pub-dots{display:flex;gap:5px;margin-bottom:14px}.pub-dots i{flex:1;height:4px;border-radius:9px;background:var(--line)}.pub-dots i.on{background:var(--green)}
+    .pub-opts{display:grid;gap:8px;margin-bottom:12px}
+    .pub-opts button{display:flex;gap:10px;align-items:center;text-align:left;margin:0;padding:13px 14px;border-radius:14px;border:1px solid var(--line);background:var(--panel2);color:var(--text);font:inherit}
+    .pub-opts button b{display:block}.pub-opts button span{font-size:12px;color:var(--muted)}
+    .pub-opts button.on{border-color:var(--green);box-shadow:0 0 0 2px var(--green) inset}
+    .pub-opts.row5{grid-template-columns:repeat(5,1fr)}.pub-opts.row5 button{justify-content:center;font-weight:800;font-size:18px;padding:14px 0}
+    .pub-chips{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:14px}.pub-chips button{margin:0;padding:8px 12px;border-radius:999px;border:1px solid var(--line);background:var(--panel2);color:var(--text);font:inherit;font-size:14px}.pub-chips button.on{background:var(--green);color:#0b120d;border-color:transparent}
+    .pub-card input{width:100%;padding:13px;border-radius:14px;border:1px solid var(--line);background:var(--panel2);color:var(--text);font:inherit;font-size:17px;margin-bottom:12px}
+    .pub-btn{width:100%;margin:4px 0 0;padding:15px;border:0;border-radius:14px;background:var(--green);color:#0b120d;font-weight:900;font-size:16px}
+    .pub-ghost{width:100%;margin:8px 0 0;background:transparent;border:0;color:var(--muted);font:inherit;padding:8px}
+    .pub-plan{border:1px solid var(--line);border-radius:14px;padding:10px 12px;margin-bottom:8px;background:var(--panel2)}.pub-plan b{display:block;margin-bottom:2px}.pub-plan span{font-size:12px;color:var(--muted)}
+    .pub-tip{border-left:4px solid var(--green)}
+    .pub-pro{border:1px dashed var(--line)}
+  </style>`);
+
+  /* ---------- Sin backend: nada se conecta con nuestras apps ---------- */
+  try{localStorage.removeItem('mp_admin_code')}catch{}
+  $('#adminGate')?.remove();
+  showAdminGate=function(){};
+  hmScheduleMine=function(){};
+  hmEnsureEntry=function(){$('#hmEntry')?.remove()};
+  gas=async function(){throw new Error('Función Pro')};
+  try{const s=s81();s.partner.driveUrl='';s.partner.code='';s.partner.upload=false;s.partner.notify=false;s.reminders.meals=false}catch{}
+  try{if(typeof saveCloudCfg==='function')saveCloudCfg({url:'',auto:false})}catch{}
+
+  /* ---------- IA: es de pago ---------- */
+  function pubPro(){
+    $('#pubPro')?.remove();
+    document.body.insertAdjacentHTML('beforeend',`<div class="modal" id="pubPro" role="dialog" aria-modal="true"><div class="modal-panel"><div class="modal-head"><div><h2 style="margin:0">✦ Mi Progreso Pro</h2><div class="small">Funciones de pago</div></div><button class="secondary" data-pub-pro-close>Cerrar</button></div>
+      <p>${esc(PUB_PRO_TXT)}</p><ul class="small" style="padding-left:18px;margin:0 0 12px"><li>Entrenador con IA: arma y ajusta tus rutinas y analiza tus entrenos.</li><li>Copia automática en la nube para no perder nada.</li><li>Chat y seguimiento con tu entrenador.</li></ul>
+      <p class="small">Todo lo demás es gratis y sin límites: rutinas, series, descansos, récords, comidas, peso y fotos. Tus datos se quedan en tu teléfono.</p>
+      <div class="modal-actions"><button class="primary" style="flex:1" data-pub-pro-close>Entendido</button></div></div></div>`);
+  }
+  openAiModal=function(){pubPro()};
+  aiAsk=async function(){pubPro();throw new Error('Función Pro')};
+  aiVision=async function(){pubPro();throw new Error('Función Pro')};
+  document.addEventListener('click',e=>{
+    if(e.target.closest('[data-pub-pro-close]')){$('#pubPro')?.remove();return}
+    if(e.target.closest('#aiBtn,#aiTrainingBtn,[data-ai],[data-ai-plan],[data-ai-routine]')){e.preventDefault();e.stopImmediatePropagation();pubPro()}
+  },true);
+
+  /* ---------- Cuestionario inicial y plan genérico ---------- */
+  function pubPrefs(){data.settings=data.settings||{};return data.settings.publica=Object.assign({done:false,name:'',goal:'',level:'',days:0,place:'',prio:[],creatina:false},data.settings.publica||{})}
+  const PUB_GOALS={musculo:['💪','Ganar músculo','Hipertrofia: más tamaño y forma'],fuerza:['🏋️','Ganar fuerza','Levantar más en los básicos'],grasa:['🔥','Bajar grasa','Mantener el músculo mientras bajas'],salud:['❤️','Salud y energía','Moverte mejor y sentirte bien']};
+  const PUB_LEVELS={nuevo:['🌱','Estoy empezando','Menos de 6 meses entrenando'],medio:['📈','Ya entreno','Entre 6 meses y 2 años'],avanzado:['🔥','Avanzado','Más de 2 años constante']};
+  const PUB_PLACES={gym:['🏢','Gimnasio','Máquinas, poleas y pesas'],casa:['🏠','Casa con mancuernas','Un par de mancuernas o ajustables'],libre:['🤸','Sin equipo','Solo con tu peso corporal']};
+  const PUB_PRIO=['Pecho','Espalda','Hombros','Brazos','Glúteos','Piernas','Abdomen'];
+  // Ejercicio de cada "hueco" según el lugar. [nombre, grupo, compuesto?]
+  const PUB_EX={
+    gym:{pecho:['Press inclinado con mancuernas','Pecho',1],pecho2:['Aperturas / Pec Deck','Pecho',0],hombro:['Press de hombro en máquina','Hombro',1],lateral:['Elevaciones laterales con mancuernas','Hombro',0],jalon:['Jalón al pecho','Espalda',1],remo:['Remo sentado en polea','Espalda',1],post:['Face pull','Hombro posterior',0],biceps:['Curl con mancuernas','Bíceps',0],triceps:['Tríceps en polea','Tríceps',0],cuad:['Prensa','Cuádriceps/Glúteo',1],cuad2:['Extensión de cuádriceps','Cuádriceps',0],bisagra:['Peso muerto rumano con mancuernas','Femoral/Glúteo',1],femoral:['Femoral sentado','Femoral',0],gluteo:['Hip thrust en máquina','Glúteo',1],aductor:['Aductores','Aductores',0],pantorrilla:['Pantorrilla','Pantorrilla',0],abdomen:['Crunch en polea','Abdomen',0]},
+    casa:{pecho:['Press inclinado con mancuernas','Pecho',1],pecho2:['Aperturas con mancuernas','Pecho',0],hombro:['Press militar con mancuernas','Hombro',1],lateral:['Elevaciones laterales con mancuernas','Hombro',0],jalon:['Pullover con mancuerna','Espalda',0],remo:['Remo con mancuerna a una mano','Espalda',1],post:['Apertura inversa con mancuernas','Hombro posterior',0],biceps:['Curl con mancuernas','Bíceps',0],triceps:['Extensión con mancuerna sobre cabeza','Tríceps',0],cuad:['Sentadilla goblet','Cuádriceps/Glúteo',1],cuad2:['Zancadas con mancuernas','Cuádriceps',1],bisagra:['Peso muerto rumano con mancuernas','Femoral/Glúteo',1],femoral:['Puente de glúteo a una pierna','Femoral/Glúteo',0],gluteo:['Hip thrust con mancuerna','Glúteo',1],aductor:['Sentadilla sumo','Aductores/Glúteo',1],pantorrilla:['Pantorrilla de pie con mancuerna','Pantorrilla',0],abdomen:['Elevación de piernas','Abdomen',0]},
+    libre:{pecho:['Flexiones','Pecho',1],pecho2:['Flexiones inclinadas','Pecho',0],hombro:['Flexiones pica','Hombro',1],lateral:['Fondos entre sillas','Tríceps',1],jalon:['Remo invertido bajo una mesa','Espalda',1],remo:['Remo con toalla en la puerta','Espalda',1],post:['Superman','Espalda',0],biceps:['Curl con toalla','Bíceps',0],triceps:['Flexiones diamante','Tríceps',0],cuad:['Sentadilla con peso corporal','Cuádriceps/Glúteo',1],cuad2:['Zancadas','Cuádriceps',1],bisagra:['Peso muerto a una pierna','Femoral/Glúteo',1],femoral:['Puente de glúteo a una pierna','Femoral/Glúteo',0],gluteo:['Glute bridge','Glúteo',1],aductor:['Sentadilla sumo','Aductores/Glúteo',1],pantorrilla:['Pantorrilla de pie','Pantorrilla',0],abdomen:['Plancha','Abdomen',0]}
+  };
+  const PUB_SPLITS={
+    2:[['Cuerpo completo A',['cuad','pecho','remo','bisagra','lateral','abdomen']],['Cuerpo completo B',['gluteo','hombro','jalon','cuad2','biceps','triceps']]],
+    3:[['Cuerpo completo A',['cuad','pecho','remo','femoral','lateral','abdomen']],['Cuerpo completo B',['bisagra','hombro','jalon','cuad2','biceps','triceps']],['Cuerpo completo C',['gluteo','pecho','remo','aductor','post','pantorrilla']]],
+    4:[['Torso A',['pecho','remo','hombro','jalon','biceps','triceps']],['Pierna A',['cuad','bisagra','cuad2','femoral','pantorrilla','abdomen']],['Torso B',['jalon','pecho','remo','lateral','post','biceps']],['Pierna B',['gluteo','cuad','femoral','aductor','pantorrilla','abdomen']]],
+    5:[['Torso',['pecho','remo','hombro','jalon','biceps','triceps']],['Pierna',['cuad','bisagra','cuad2','femoral','pantorrilla']],['Empuje',['pecho','hombro','pecho2','lateral','triceps','abdomen']],['Tirón',['jalon','remo','post','biceps','biceps']],['Pierna y glúteo',['gluteo','cuad','femoral','aductor','pantorrilla','abdomen']]],
+    6:[['Empuje A',['pecho','hombro','pecho2','lateral','triceps']],['Tirón A',['jalon','remo','post','biceps']],['Pierna A',['cuad','bisagra','cuad2','pantorrilla','abdomen']],['Empuje B',['hombro','pecho','lateral','pecho2','triceps']],['Tirón B',['remo','jalon','post','biceps']],['Pierna B',['gluteo','cuad','femoral','aductor','abdomen']]]
+  };
+  const PUB_DAYS={2:[1,4],3:[1,3,5],4:[1,2,4,5],5:[1,2,3,5,6],6:[1,2,3,4,5,6]};
+  const PUB_PRIO_SLOTS={Pecho:['pecho','pecho2'],Espalda:['jalon','remo'],Hombros:['hombro','lateral','post'],Brazos:['biceps','triceps'],Glúteos:['gluteo','bisagra'],Piernas:['cuad','cuad2','femoral'],Abdomen:['abdomen']};
+  function pubDose(goal,level,comp){
+    const nuevo=level==='nuevo';
+    let d=goal==='fuerza'?(comp?{sets:4,reps:'4–6',rir:'2',rest:210}:{sets:3,reps:'8–10',rir:'1–2',rest:120})
+      :goal==='grasa'?(comp?{sets:3,reps:'8–12',rir:'2',rest:120}:{sets:3,reps:'12–15',rir:'1–2',rest:75})
+      :goal==='salud'?(comp?{sets:3,reps:'10–12',rir:'2–3',rest:120}:{sets:2,reps:'12–15',rir:'2',rest:75})
+      :(comp?{sets:3,reps:'8–12',rir:'1–2',rest:150}:{sets:3,reps:'10–15',rir:'1',rest:90});
+    d={...d};if(nuevo){d.sets=Math.min(d.sets,3);d.rir=comp?'2–3':'2'}
+    if(level==='avanzado'&&comp&&goal!=='salud')d.sets=Math.min(5,d.sets+1);
+    return d;
+  }
+  function pubBuildPlan(p){
+    const lib=PUB_EX[p.place]||PUB_EX.gym,split=PUB_SPLITS[p.days]||PUB_SPLITS[3],days=PUB_DAYS[p.days]||PUB_DAYS[3];
+    const prioSlots=new Set((p.prio||[]).flatMap(x=>PUB_PRIO_SLOTS[x]||[]));
+    return days.map((day,i)=>{
+      const [title,slots]=split[i%split.length],items=[],presc={};
+      slots.forEach(sl=>{const ex=lib[sl];if(!ex)return;let name=ex[0];if(items.includes(name)){const alt={biceps:'Curl martillo',pecho:'Press de pecho en máquina'}[sl];if(!alt||p.place!=='gym'||items.includes(alt))return;name=alt}
+        items.push(name);const d=pubDose(p.goal,p.level,!!ex[2]);if(prioSlots.has(sl))d.sets=Math.min(5,d.sets+1);presc[name]=d});
+      return {day,title:`${DAY_NAMES[day]} · ${title}`,items,prescription:presc};
+    });
+  }
+  function pubEnsureExercises(place){
+    const lib=PUB_EX[place]||PUB_EX.gym;
+    Object.values(lib).forEach(([name,group])=>{if(!CATALOG_BY_NAME.has(name))createCustomExercise(name,group,place==='libre'?'Peso corporal':place==='casa'?'Mancuernas':'')});
+  }
+  function pubApplyPlan(p){
+    pubEnsureExercises(p.place);
+    const plan=pubBuildPlan(p);
+    for(const [id,r] of Object.entries(data.customRoutines||{}))if(r&&r.pub)delete data.customRoutines[id];
+    data.customRoutines=data.customRoutines||{};
+    for(let d=1;d<=7;d++){
+      const r=plan.find(x=>x.day===d);
+      data.customRoutines['pub'+d]=r?{title:r.title,day:String(d),items:r.items,prescription:r.prescription,pub:true}:{title:`${DAY_NAMES[d]} · Descanso`,day:String(d),items:[],prescription:{},pub:true};
+    }
+    data.settings.hideBuiltinRoutines=true;
+    rebuildRoutines();persist();
+  }
+  const PUB_TIPS={
+    general:['Anota cada serie: peso, repeticiones y qué tan cerca quedaste del fallo (RIR). Así sabes cuándo subir.','Sube el peso cuando completes el tope de repeticiones en todas las series con buena técnica.','Calienta con 1 o 2 series ligeras del primer ejercicio antes de las series de verdad.','Dormir 7 a 9 horas pesa tanto como el entreno para progresar.','La constancia gana: mejor 3 días cada semana que 6 días una semana y ninguno la siguiente.','Si una máquina está ocupada, cambia el orden o usa “Sustituir” en vez de saltarte el ejercicio.','Toma agua durante el entreno y come proteína en cada comida del día.','Si algo duele (no es cansancio, es dolor), para ese ejercicio y cámbialo por una variante.'],
+    musculo:['Para ganar músculo, deja 1 o 2 repeticiones en reserva y trata de superar tu marca poco a poco.','Come un poco por encima de lo que gastas y reparte la proteína en el día.'],
+    fuerza:['En los básicos descansa más (3 minutos o más): rinde mejor la siguiente serie.','Cuida la técnica antes que el peso: la fuerza se construye con repeticiones limpias.'],
+    grasa:['Para bajar grasa, sigue entrenando pesado: es lo que conserva tu músculo mientras comes menos.','Camina más en el día: suma mucho sin quitarle energía al entreno.'],
+    salud:['Lo importante es moverte seguido: aunque sea una sesión corta, cuenta.','Suma estiramientos suaves al final si te sientes rígido.']
+  };
+  function pubTipsFor(p,n=3){
+    const g=PUB_TIPS[p.goal]||[],G=PUB_TIPS.general.filter(t=>p.place!=='libre'||!/sube el peso/i.test(t)),k=Math.floor(Date.now()/86400000);
+    if(n===1)return [(k%2&&g.length)?g[k%g.length]:G[k%G.length]];
+    return [...g.slice(0,1),...Array.from({length:n},(_,i)=>G[(k+i)%G.length])].slice(0,n);
+  }
+
+  let pubOn={i:0,a:null};
+  const PUB_STEPS=['hi','name','goal','level','days','place','prio','creatina','done'];
+  function pubGateEl(){let g=$('#pubGate');if(!g){document.body.insertAdjacentHTML('beforeend','<div class="pub-gate" id="pubGate" role="dialog" aria-modal="true"></div>');g=$('#pubGate')}return g}
+  function pubShowOnboarding(){const p=pubPrefs();pubOn={i:0,a:{name:p.name||'',goal:p.goal||'',level:p.level||'',days:p.days||0,place:p.place||'',prio:(p.prio||[]).slice(),creatina:!!p.creatina}};pubRender()}
+  function pubOpts(key,map){return `<div class="pub-opts">${Object.entries(map).map(([k,[ic,t,s]])=>`<button data-pub-pick="${key}" data-v="${k}" class="${pubOn.a[key]===k?'on':''}"><span style="font-size:24px">${ic}</span><span><b>${esc(t)}</b><span>${esc(s)}</span></span></button>`).join('')}</div>`}
+  function pubRender(){
+    const k=PUB_STEPS[pubOn.i],a=pubOn.a,dots=`<div class="pub-dots">${PUB_STEPS.map((_,i)=>`<i class="${i<=pubOn.i?'on':''}"></i>`).join('')}</div>`;
+    let h='';
+    if(k==='hi')h=`<div class="pub-q">💪</div><h1>Bienvenido a Mi Progreso</h1><p>Te hago 6 preguntas rápidas y te armo una rutina para empezar. Todo se guarda solo en tu teléfono.</p><button class="pub-btn" data-pub-next>Empezar</button>`;
+    if(k==='name')h=`<div class="pub-q">👋</div><h1>¿Cómo te llamas?</h1><p>Opcional, para saludarte.</p><input id="pubName" maxlength="30" autocomplete="off" value="${esc(a.name)}" placeholder="Tu nombre"><button class="pub-btn" data-pub-next>Continuar</button>`;
+    if(k==='goal')h=`<div class="pub-q">🎯</div><h1>¿Cuál es tu objetivo principal?</h1>${pubOpts('goal',PUB_GOALS)}`;
+    if(k==='level')h=`<div class="pub-q">📊</div><h1>¿Cuánta experiencia tienes?</h1>${pubOpts('level',PUB_LEVELS)}`;
+    if(k==='days')h=`<div class="pub-q">📅</div><h1>¿Cuántos días por semana puedes entrenar?</h1><p>Elige lo que de verdad puedas sostener.</p><div class="pub-opts row5">${[2,3,4,5,6].map(d=>`<button data-pub-pick="days" data-v="${d}" class="${a.days===d?'on':''}">${d}</button>`).join('')}</div>`;
+    if(k==='place')h=`<div class="pub-q">📍</div><h1>¿Dónde vas a entrenar?</h1>${pubOpts('place',PUB_PLACES)}`;
+    if(k==='prio')h=`<div class="pub-q">⭐</div><h1>¿Qué quieres mejorar más?</h1><p>Opcional. Le doy una serie extra a esos músculos.</p><div class="pub-chips">${PUB_PRIO.map(x=>`<button data-pub-prio="${esc(x)}" class="${a.prio.includes(x)?'on':''}">${esc(x)}</button>`).join('')}</div><button class="pub-btn" data-pub-next>${a.prio.length?'Continuar':'Ninguno en especial'}</button>`;
+    if(k==='creatina')h=`<div class="pub-q">💊</div><h1>¿Tomas creatina u otro suplemento diario?</h1><p>Si dices que sí, en Inicio tendrás un botón para marcarla cada día.</p><div class="pub-opts"><button data-pub-pick="creatina" data-v="no" class="${a.creatina===false&&pubOn.i>0&&a._c?'on':''}"><span style="font-size:24px">➖</span><span><b>No, gracias</b></span></button><button data-pub-pick="creatina" data-v="si" class="${a.creatina?'on':''}"><span style="font-size:24px">✅</span><span><b>Sí, quiero marcarla</b></span></button></div>`;
+    if(k==='done'){const plan=pubBuildPlan(a);h=`<div class="pub-q">✨</div><h1>${a.name?esc(a.name)+', tu':'Tu'} plan está listo</h1><p>${esc(PUB_GOALS[a.goal]?.[1]||'')} · ${a.days} días · ${esc(PUB_PLACES[a.place]?.[1]||'')}</p>${plan.map(r=>`<div class="pub-plan"><b>${esc(r.title)}</b><span>${r.items.map(esc).join(' · ')}</span></div>`).join('')}<p class="small" style="margin-top:10px"><b>Consejos para empezar:</b><br>${pubTipsFor(a,3).map(t=>'• '+esc(t)).join('<br>')}</p><p class="small">Puedes cambiar ejercicios y series en Entrenar → “Crear o editar mis rutinas”, o repetir este cuestionario en Ajustes ⚙.</p><button class="pub-btn" data-pub-finish>¡A entrenar! 💪</button>`}
+    pubGateEl().innerHTML=`<div class="pub-card">${dots}${h}${pubOn.i>0?'<button class="pub-ghost" data-pub-back>Atrás</button>':(pubPrefs().done?'<button class="pub-ghost" data-pub-cancel>Cancelar</button>':'')}</div>`;
+  }
+  function pubNext(){const k=PUB_STEPS[pubOn.i];if(k==='name')pubOn.a.name=($('#pubName')?.value||'').trim().slice(0,30);pubOn.i=Math.min(PUB_STEPS.length-1,pubOn.i+1);pubRender();$('#pubGate')?.scrollTo(0,0)}
+  function pubFinish(){
+    const p=pubPrefs(),a=pubOn.a;delete a._c;Object.assign(p,{...a,done:true});try{renderToday()}catch{}
+    pubApplyPlan(p);$('#pubGate')?.remove();pubHome();toast('✓ Rutina lista. Ve a Entrenar para empezar.');
+  }
+  document.addEventListener('click',e=>{
+    const t=e.target;
+    if(t.closest('[data-pub-next]')){pubNext();return}
+    if(t.closest('[data-pub-back]')){pubOn.i=Math.max(0,pubOn.i-1);pubRender();return}
+    if(t.closest('[data-pub-cancel]')){$('#pubGate')?.remove();return}
+    const pk=t.closest('[data-pub-pick]');if(pk){const key=pk.dataset.pubPick;pubOn.a[key]=key==='days'?Number(pk.dataset.v):key==='creatina'?pk.dataset.v==='si':pk.dataset.v;if(key==='creatina')pubOn.a._c=1;pubRender();setTimeout(pubNext,180);return}
+    const pr=t.closest('[data-pub-prio]');if(pr){const v=pr.dataset.pubPrio,L=pubOn.a.prio;const i=L.indexOf(v);if(i>=0)L.splice(i,1);else L.push(v);pubRender();return}
+    if(t.closest('[data-pub-finish]')){pubFinish();return}
+    if(t.closest('[data-pub-redo]')){try{closeM('settingsModal')}catch{}pubShowOnboarding();return}
+    if(t.closest('[data-pub-pro]')){pubPro();return}
+    if(t.closest('[data-pub-hide-pro]')){pubPrefs().hidePro=true;persist(true);$('#pubProCard')?.remove();return}
+  });
+  document.addEventListener('keydown',e=>{if(e.key==='Enter'&&e.target.id==='pubName'){e.preventDefault();pubNext()}});
+
+  /* ---------- Inicio: consejo del día y Pro ---------- */
+  function pubHome(){
+    const home=$('#home');if(!home)return;const p=pubPrefs();
+    $('#pubTipCard')?.remove();$('#pubProCard')?.remove();
+    if(!p.done)return;
+    const anchor=home.querySelector('.hero');
+    const tip=`<div class="card pub-tip" id="pubTipCard"><strong>💡 Consejo del día${p.name?' para '+esc(p.name):''}</strong><p class="small" style="margin:6px 0 0">${esc(pubTipsFor(p,1)[0])}</p></div>`;
+    const pro=p.hidePro?'':`<div class="card pub-pro" id="pubProCard"><div class="row between"><strong>✦ ¿Quieres un entrenador con IA?</strong><button class="linkbtn" data-pub-hide-pro aria-label="Ocultar">✕</button></div><p class="small" style="margin:6px 0 10px">Rutinas que se ajustan solas, análisis de tus entrenos y copia en la nube. Es de pago.</p><button class="secondary" data-pub-pro>Ver qué incluye</button></div>`;
+    if(anchor)anchor.insertAdjacentHTML('afterend',tip+pro);else home.insertAdjacentHTML('afterbegin',tip+pro);
+  }
+
+  /* ---------- Ajustes: quitar lo que es de nuestras apps y agregar "Mi plan" ---------- */
+  const _rsPub=renderSettings;
+  renderSettings=function(){
+    const r=_rsPub.apply(this,arguments);
+    try{
+      const box=$('#settingsContent');if(!box)return r;
+      box.querySelectorAll('details.settings-group').forEach(d=>{const s=(d.querySelector('summary')?.textContent||'');if(/drive|nube|ella|jaider|pareja|compartid|motivaci|claves de ia|chat/i.test(s))d.remove()});
+      box.querySelectorAll('[data-hm-share],[data-hm-open]').forEach(x=>x.closest('label,div')?.remove());
+      const p=pubPrefs();
+      box.insertAdjacentHTML('afterbegin',`<details class="settings-group" open><summary>🎯 Mi plan</summary><div class="settings-section"><p class="small" style="margin-top:0">${p.done?`${esc(PUB_GOALS[p.goal]?.[1]||'')} · ${p.days} días · ${esc(PUB_PLACES[p.place]?.[1]||'')}`:'Aún no has hecho el cuestionario.'}</p><button class="secondary" data-pub-redo>Rehacer el cuestionario</button><p class="small">Al rehacerlo se reemplazan las rutinas que armó la app (las tuyas no se tocan). Tu historial no cambia.</p></div></details>
+        <div class="v85-share" style="border-style:dashed"><span style="font-size:28px">✦</span><div class="t"><b>Mi Progreso Pro</b><span class="small">IA, nube y chat (de pago).</span></div><button class="secondary" data-pub-pro>Ver</button></div>`);
+    }catch(e){console.error(e)}
+    return r;
+  };
+  // Creatina: solo si la persona dijo que la toma
+  const _rtPub=renderToday;
+  renderToday=function(){
+    const r=_rtPub.apply(this,arguments);
+    try{if(!pubPrefs().creatina){const host=$('#todayBox');host?.querySelector('[data-creatine-day]')?.remove();const sp=host?.querySelector('.today-card .row .small');if(sp)sp.textContent=`${host.querySelectorAll('.today-item.ok').length}/3 listos`}}catch{}
+    return r;
+  };
+  const _rnaPub=runNativeAction;
+  runNativeAction=function(a){if(a==='partner'||a==='go:requests'||a.startsWith('go:chat'))return go('home');return _rnaPub(a)};
+
+  setTimeout(()=>{$('#adminGate')?.remove();try{renderToday()}catch{}if(!pubPrefs().done)pubShowOnboarding();else pubHome()},60);
+  const _pubGo=go;go=function(s){const r=_pubGo.apply(this,arguments);if(s==='home')setTimeout(pubHome,30);return r};

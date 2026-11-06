@@ -3,3 +3,5 @@ trabajo/
 *.pk8
 *.jks
 *.keystore
+__pycache__/
+herramientas/libre_base_*.apk

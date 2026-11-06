@@ -13,3 +13,10 @@ Las apps revisan los Releases de este repositorio y avisan cuando hay una versi�
 3. Si la versión ya existía, reemplaza sus APK (sirve para corregir una versión publicada).
 
 Descarga directa de la última versión: https://github.com/JaiderRico/APP_GYM/releases/latest
+
+## Mi Progreso Libre (app pública)
+
+Versión para cualquier persona, sin conexión con nuestras apps (todo queda en el teléfono).
+Se publica aparte, en el pre-release fijo `publica`, con el workflow `Publicar app libre` (carpeta `publica/vX.Y.Z/`).
+
+Descarga directa: https://github.com/JaiderRico/APP_GYM/releases/download/publica/MiProgreso_Libre.apk

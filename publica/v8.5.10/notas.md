@@ -1,0 +1,5 @@
+- 🎯 Cuestionario inicial: objetivo, experiencia, días, lugar y músculos a priorizar
+- 📋 Rutina armada automáticamente para tu plan (gimnasio, casa o sin equipo)
+- 💡 Consejo del día
+- ⧉ Ventana flotante para el descanso
+- 🔒 Todo se guarda solo en tu teléfono
