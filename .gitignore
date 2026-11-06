@@ -1,0 +1,5 @@
+trabajo/
+*.pem
+*.pk8
+*.jks
+*.keystore
