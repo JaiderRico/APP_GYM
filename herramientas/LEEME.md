@@ -4,7 +4,8 @@
 - Dos apps Android tipo WebView: **Mi Progreso** (Jaider, `com.jaider.gimnasio`) y **Mi Progreso Ella** (`com.jaider.gimnasio.ella`).
 - Toda la interfaz y la lógica están en `assets/index.html` dentro de cada APK.
 - No hay proyecto de Android Studio: se edita la APK publicada más reciente y se vuelve a firmar.
-- `fuente/MiProgreso_Backend_v12.gs`: el backend (Google Apps Script). Tiene marcadores en lugar de los códigos reales; Jaider lo pega en script.google.com y pone sus claves.
+- `fuente/MiProgreso_Backend.gs`: el backend (Google Apps Script). Las claves NO están en el código: viven en las Propiedades del script (CODIGO_ELLA, CODIGO_ADMIN, GROQ_API_KEY).
+  Al hacer push de un cambio a este archivo, el workflow **Actualizar Apps Script** lo sube con clasp, actualiza la misma implementación (la URL no cambia) y comprueba `?action=health`.
 - `fuente/MsgPoll.java`: código nativo que hace las notificaciones con la app cerrada (ya está dentro de las APK como classes6.dex, y `Reminders.onReceive` lo llama).
 
 ## Pasos
@@ -22,4 +23,4 @@
 - No decir "Drive" ni "carpeta compartida" en la app de Ella: decir "la nube".
 - Datos por usuario: la app de Ella manda `app:'ella'` en cada llamada al backend. Con el código de Ella usa los archivos de ella; con el código de administrador (Jaider probando) usa `progreso_prueba.json`.
 - Sin API keys ni códigos dentro de las APK (el repo es público).
-- Si cambias el backend, entrega el `.gs` completo a Jaider y recuérdale actualizar la implementación con "Nueva versión" (sin cambiar la URL).
+- Backend: edítalo en `herramientas/fuente/MiProgreso_Backend.gs`, pruébalo (node --check y, si puedes, con un simulador de DriveApp) y haz push; revisa que "Actualizar Apps Script" termine en verde. Nunca escribas claves reales en el archivo. Mantén compatibles las acciones que ya usan las apps instaladas.

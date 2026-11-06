@@ -1,5 +1,5 @@
 // ============================================================================
-// BACKEND MI PROGRESO v12 — Google Apps Script (respaldo en Drive + app de Ella)
+// BACKEND MI PROGRESO v13 — Google Apps Script (respaldo en Drive + app de Ella)
 // ============================================================================
 // NOVEDAD v12 — DATOS POR USUARIO:
 //   La app de Ella (8.4.13+) manda app:'ella' en cada llamada. Con eso el backend sabe
@@ -15,9 +15,13 @@
 // Carpeta "Mi Progreso v8.0":
 // https://drive.google.com/drive/folders/1hUkPHwACKs533vFBA0_D4VymitggIXKD
 //
-// CÓMO ACTUALIZARLO (sin cambiar la URL /exec que ya usan las apps):
+// v13: las claves viven en "Propiedades del script" y GitHub Actions publica este archivo
+//      solo (workflow "Actualizar Apps Script") cuando cambia en el repo.
+//
+// CÓMO ACTUALIZARLO A MANO (sin cambiar la URL /exec que ya usan las apps):
 // 1. Abre tu proyecto en https://script.google.com, borra el código y pega este archivo.
-// 2. Cambia las 3 constantes privadas de abajo (códigos y API key de Groq) y guarda (💾).
+// 2. La primera vez: ⚙️ Configuración del proyecto → Propiedades del script → agrega
+//    CODIGO_ELLA, CODIGO_ADMIN y GROQ_API_KEY. Guarda (💾).
 // 3. "Implementar" -> "Gestionar implementaciones" -> lápiz ✏️ de la implementación actual
 //    -> Versión: "Nueva versión" -> "Implementar".
 //    (Si haces "Nueva implementación" la URL cambia y tendrías que ponerla en las apps.)
@@ -46,10 +50,22 @@
 //   (Con app:'ella' + código admin, las acciones de Ella usan el usuario "prueba".)
 // ============================================================================
 
-// ---------- CONSTANTES PRIVADAS (solo viven aquí, nunca en el APK) ----------
-const CODIGO_ELLA  = "TU_CODIGO_SECRETO_AQUI";
-const CODIGO_ADMIN = "TU_CODIGO_ADMIN";
-const GROQ_API_KEY = "TU_API_KEY_DE_GROQ";
+// ---------- CLAVES PRIVADAS (nunca en el APK ni en el código) ----------
+// Se guardan en Apps Script → ⚙️ Configuración del proyecto → Propiedades del script:
+//   CODIGO_ELLA, CODIGO_ADMIN, GROQ_API_KEY
+// Así el código se puede actualizar automáticamente desde GitHub sin borrar las claves.
+// (Si alguna propiedad falta, se usa el valor de respaldo de aquí abajo.)
+function prop_(k, respaldo) {
+  try { const v = PropertiesService.getScriptProperties().getProperty(k); return v ? String(v).trim() : respaldo; }
+  catch (e) { return respaldo; }
+}
+const CODIGO_ELLA  = prop_('CODIGO_ELLA',  "TU_CODIGO_SECRETO_AQUI");
+const CODIGO_ADMIN = prop_('CODIGO_ADMIN', "TU_CODIGO_ADMIN");
+const GROQ_API_KEY = prop_('GROQ_API_KEY', "TU_API_KEY_DE_GROQ");
+const BACKEND_VERSION = 'v13';
+function clavesConfiguradas_() {
+  return CODIGO_ELLA !== "TU_CODIGO_SECRETO_AQUI" && CODIGO_ADMIN !== "TU_CODIGO_ADMIN";
+}
 
 // Las acciones nuevas piden el código guardado en la app. Así, aunque alguien saque la
 // URL del APK público de GitHub, no puede leer los datos ni mandar mensajes.
@@ -477,6 +493,11 @@ const ACTIONS = {
     return { ok: false, error: 'Foto no encontrada' };
   },
 
+  // Comprobación para la automatización de GitHub (no revela ninguna clave).
+  health: function () {
+    return { ok: true, version: BACKEND_VERSION, clavesConfiguradas: clavesConfiguradas_() };
+  },
+
   // Novedades para notificar con la app cerrada (la app consulta cada ~15 min).
   // App de Ella: mensajes sin leer y rutinas nuevas de Jaider.
   // App de Jaider: respuestas de Ella y entrenos que terminó (últimas 36 h).
@@ -573,5 +594,5 @@ function probarConfiguracion() {
   Logger.log('Mensajes guardados: ' + loadMessages(folder).length);
   Logger.log('progreso_ella.json: ' + (findFile(folder, HER_FILE) ? 'sí' : 'aún no'));
   Logger.log('progreso_prueba.json: ' + (findFile(folder, USUARIOS.prueba.file) ? 'sí' : 'aún no'));
-  Logger.log('Códigos configurados: ' + (CODIGO_ELLA !== 'TU_CODIGO_SECRETO_AQUI' && CODIGO_ADMIN !== 'TU_CODIGO_ADMIN'));
+  Logger.log('Códigos configurados: ' + clavesConfiguradas_());
 }

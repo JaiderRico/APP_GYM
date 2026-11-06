@@ -1,0 +1,79 @@
+# Sube herramientas/fuente/MiProgreso_Backend.gs al proyecto de Apps Script y actualiza la
+# implementación que ya usan las apps (la URL /exec NO cambia).
+# Necesita los secretos del repositorio:
+#   CLASPRC_JSON  -> contenido de ~/.clasprc.json después de "clasp login" (clasp 2.4.2)
+#   SCRIPT_ID     -> ID del proyecto (Apps Script → ⚙️ Configuración del proyecto → ID de la secuencia de comandos)
+# Las claves (CODIGO_ELLA, CODIGO_ADMIN, GROQ_API_KEY) viven en las Propiedades del script, no aquí.
+name: Actualizar Apps Script
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'herramientas/fuente/MiProgreso_Backend.gs'
+      - 'herramientas/apps-script/**'
+  workflow_dispatch:
+
+concurrency:
+  group: actualizar-apps-script
+  cancel-in-progress: false
+
+env:
+  DEPLOYMENT_ID: AKfycbwrlaJgyxtAS2uAUG4snTyA6EvFBYG17XtA5brvHYJWEvRL7clCg5lrhV2oILhdMcn7
+
+jobs:
+  publicar:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Revisar sintaxis
+        run: |
+          cp herramientas/fuente/MiProgreso_Backend.gs "$RUNNER_TEMP/backend.js"
+          node --check "$RUNNER_TEMP/backend.js"
+
+      - name: Preparar clasp
+        env:
+          CLASPRC_JSON: ${{ secrets.CLASPRC_JSON }}
+          SCRIPT_ID: ${{ secrets.SCRIPT_ID }}
+        run: |
+          set -euo pipefail
+          if [ -z "${CLASPRC_JSON:-}" ] || [ -z "${SCRIPT_ID:-}" ]; then
+            if [ "$GITHUB_EVENT_NAME" = "push" ]; then
+              echo "::warning::Faltan los secretos CLASPRC_JSON / SCRIPT_ID: no se actualizó el Apps Script."
+              echo "SALTAR=1" >> "$GITHUB_ENV"; exit 0
+            fi
+            echo "::error::Faltan los secretos CLASPRC_JSON y/o SCRIPT_ID"; exit 1
+          fi
+          npm install -g @google/clasp@2.4.2 >/dev/null
+          (umask 077; printf '%s' "$CLASPRC_JSON" > "$HOME/.clasprc.json")
+          mkdir -p build
+          cp herramientas/fuente/MiProgreso_Backend.gs build/Backend.js
+          cp herramientas/apps-script/appsscript.json build/
+          printf '{"scriptId":"%s","rootDir":"."}' "$SCRIPT_ID" > build/.clasp.json
+
+      - name: Subir código y actualizar la implementación
+        if: env.SALTAR != '1'
+        working-directory: build
+        run: |
+          set -euo pipefail
+          clasp push --force
+          clasp deploy --deploymentId "$DEPLOYMENT_ID" --description "GitHub ${GITHUB_SHA::7}"
+
+      - name: Comprobar que responde y tiene las claves
+        if: env.SALTAR != '1'
+        run: |
+          set -euo pipefail
+          sleep 5
+          R=$(curl -sSL "https://script.google.com/macros/s/$DEPLOYMENT_ID/exec?action=health")
+          echo "$R"
+          echo "$R" | jq -e '.ok == true' >/dev/null || { echo "::error::El Apps Script no respondió bien"; exit 1; }
+          echo "$R" | jq -e '.clavesConfiguradas == true' >/dev/null || { echo "::error::Faltan CODIGO_ELLA / CODIGO_ADMIN en Propiedades del script. Las apps no podrán entrar hasta agregarlas."; exit 1; }
+
+      - name: Limpiar credenciales
+        if: always()
+        run: rm -f "$HOME/.clasprc.json"
