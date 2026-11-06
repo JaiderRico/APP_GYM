@@ -1,0 +1,2 @@
+- ☁️ Respaldo más simple: sin configuración técnica, solo "Respaldar ahora" y "Restaurar respaldo"
+- Textos del respaldo más claros
