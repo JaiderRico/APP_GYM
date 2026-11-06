@@ -1,0 +1,2 @@
+- 👥 Respaldo por usuario: si Jaider prueba la app de Ella con su código, todo queda en un respaldo aparte y no toca los datos de ella
+- 🧪 En modo prueba, leer o responder mensajes y guardar rutinas tampoco cambia lo que ella ve
