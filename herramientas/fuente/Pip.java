@@ -11,6 +11,7 @@ import android.util.Rational;
  *   "supported"      -> ¿el teléfono permite ventana flotante?
  *   "enter[:w:h]"    -> abre la app en ventana flotante (proporción opcional, por defecto 9:16)
  *   "auto:1|auto:0"  -> Android 12+: al salir con el botón de inicio entra sola en ventana flotante
+ *   "auto:w:h:1|0"   -> (8.5.15) igual, con la forma elegida en Ajustes (9:16, 3:4, 1:1, 16:9)
  *   "active"         -> ¿está ahora en ventana flotante?
  * Se usa reflexión para no depender de la versión del SDK con que se compile (minSdk 26).
  * El manifiesto de MainActivity tiene supportsPictureInPicture, resizeableActivity y configChanges
@@ -26,7 +27,14 @@ final class Pip {
         final Activity a = (Activity) ctx;
         if ("active".equals(v)) return active(a);
         if (!supported(ctx)) return false;
-        if (v.startsWith("auto:")) return auto(a, v.endsWith("1"));
+        if (v.startsWith("auto:")) {
+            String[] p = v.split(":");
+            int w = 9, h = 16;
+            if (p.length == 4) {
+                try { w = Integer.parseInt(p[1]); h = Integer.parseInt(p[2]); } catch (Throwable ignored) { }
+            }
+            return auto(a, v.endsWith("1"), w, h);
+        }
         if (v.startsWith("enter")) {
             int w = 9, h = 16;
             String[] p = v.split(":");
@@ -78,13 +86,13 @@ final class Pip {
         }
     }
 
-    static boolean auto(final Activity a, final boolean on) {
+    static boolean auto(final Activity a, final boolean on, final int w, final int h) {
         if (Build.VERSION.SDK_INT < 31) return false;
         a.runOnUiThread(new Runnable() {
             @Override public void run() {
                 try {
                     Class<?> pc = Class.forName("android.app.PictureInPictureParams");
-                    Activity.class.getMethod("setPictureInPictureParams", pc).invoke(a, params(9, 16, on));
+                    Activity.class.getMethod("setPictureInPictureParams", pc).invoke(a, params(w, h, on));
                 } catch (Throwable ignored) { }
             }
         });

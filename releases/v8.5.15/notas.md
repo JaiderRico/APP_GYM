@@ -1,0 +1,3 @@
+- Ventana flotante rediseñada: muestra claramente la serie (calentamiento o efectiva), el ejercicio, el peso grande, las reps y el RIR; en el descanso, el tiempo con barra de progreso y qué sigue con el peso a preparar.
+- Ventana flotante: en Ajustes eliges la forma (vertical, media, cuadrada u horizontal) y el tamaño de la letra; se puede agrandar con dos dedos y el contenido se adapta.
+- Calentamiento: el primer ejercicio de cada músculo (p. ej. press inclinado en pecho, jalón al pecho en espalda) vuelve a recibir su calentamiento; se ignoran proporciones aprendidas que no servían (iguales al peso de trabajo o de otra unidad).

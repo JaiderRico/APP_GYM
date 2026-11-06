@@ -1,0 +1,1 @@
+- Ventana flotante más clara y con forma/letra elegibles; calentamiento del primer ejercicio de cada músculo arreglado.

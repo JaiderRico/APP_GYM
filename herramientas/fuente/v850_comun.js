@@ -1,4 +1,4 @@
-  /* ===================== v8.5.0: chat, varias claves de IA, compartir la app libre y ventana flotante ===================== */
+  /* ===================== v8.5.0 (+8.5.15 ventana flotante): chat, varias claves de IA, compartir la app libre y ventana flotante ===================== */
   // (Mismo bloque en las dos apps; MP_APK_IS_ELLA decide los textos y qué helper usa para hablar con el servidor.)
   const V85_ELLA=!!MP_APK_IS_ELLA;
   const V85_PUBLIC_URL='https://github.com/JaiderRico/APP_GYM/releases/download/publica/MiProgreso_Libre.apk';
@@ -34,11 +34,35 @@
     #v85PipBtn{margin:0 0 8px 8px}
     #v85Mini{display:none}
     body.v85-mini > *:not(#v85Mini):not(script):not(style){display:none!important}
-    body.v85-mini #v85Mini{display:flex;position:fixed;inset:0;flex-direction:column;align-items:center;justify-content:center;gap:4px;padding:8px;text-align:center;background:var(--bg);color:var(--text)}
-    #v85Mini .k{font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
-    #v85Mini .big{font-size:44px;font-weight:900;line-height:1;font-variant-numeric:tabular-nums}
-    #v85Mini .t{font-size:15px;font-weight:700;max-width:100%;overflow:hidden;text-overflow:ellipsis}
-    #v85Mini .s{font-size:12px;color:var(--muted);max-width:100%}
+    body.v85-mini{overflow:hidden!important}
+    body.v85-mini #v85Mini{--s:1;display:flex;position:fixed;inset:0;flex-direction:column;justify-content:center;gap:calc(1.4vmin*var(--s));padding:calc(4vmin*var(--s)) calc(5vmin*var(--s));background:var(--bg);color:var(--text);overflow:hidden;font-family:inherit}
+    body.v85-mini #v85Mini.lg{--s:1.18}body.v85-mini #v85Mini.sm{--s:.86}
+    #v85Mini .mpc{align-self:flex-start;justify-self:start;display:inline-flex;align-items:center;gap:.4em;padding:.28em .7em;border-radius:99px;background:var(--panel2,#222);border:1px solid var(--line,#333);font-size:calc(5.2vmin*var(--s));font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);white-space:nowrap;max-width:100%;overflow:hidden;text-overflow:ellipsis}
+    #v85Mini .mpc.warm{color:#ffd49a;border-color:#725b37;background:#2a2418}
+    #v85Mini .mpc.rest{color:var(--green2,var(--green));border-color:var(--green)}
+    #v85Mini .mpc.pause{color:#ffaaa1;border-color:#724540}
+    #v85Mini .mpn{font-size:calc(7.4vmin*var(--s));font-weight:800;line-height:1.15;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+    #v85Mini .mph{display:flex;align-items:baseline;flex-wrap:wrap;gap:0 .3em;line-height:1}
+    #v85Mini .mph b{font-size:calc(19vmin*var(--s));font-weight:900;font-variant-numeric:tabular-nums;letter-spacing:-.02em}
+    #v85Mini .mph span{font-size:calc(7vmin*var(--s));font-weight:700;color:var(--muted)}
+    #v85Mini .mph.timer b{font-size:calc(24vmin*var(--s))}
+    #v85Mini .mph.timer.low b{color:var(--green2,var(--green))}
+    #v85Mini .mpf{display:flex;flex-wrap:wrap;gap:calc(1.6vmin*var(--s))}
+    #v85Mini .mpf i{font-style:normal;font-size:calc(5.6vmin*var(--s));font-weight:700;padding:.25em .55em;border-radius:.6em;background:var(--panel,#1a1a1a);border:1px solid var(--line,#333);white-space:nowrap}
+    #v85Mini .mpb{height:calc(2vmin*var(--s));min-height:4px;border-radius:99px;background:var(--panel2,#222);overflow:hidden}
+    #v85Mini .mpb span{display:block;height:100%;background:var(--green);transition:width .4s linear}
+    #v85Mini .mpx{border-top:1px solid var(--line,#333);padding-top:calc(2vmin*var(--s));font-size:calc(5.6vmin*var(--s));color:var(--muted);line-height:1.3}
+    #v85Mini .mpx strong{display:block;color:var(--text);font-size:calc(6.4vmin*var(--s));white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    #v85Mini .mpm{font-size:calc(5.4vmin*var(--s));color:var(--muted);line-height:1.3}
+    @media (min-aspect-ratio:5/4){
+      body.v85-mini #v85Mini{display:grid;grid-template-columns:auto minmax(0,1fr);grid-auto-flow:dense;align-content:center;column-gap:5vmin}
+      #v85Mini .mpc,#v85Mini .mpn,#v85Mini .mpx,#v85Mini .mpb,#v85Mini .mpm{grid-column:1/-1}
+      #v85Mini .mph{grid-column:1}#v85Mini .mpf{grid-column:2;align-self:center}
+    }
+    .v85-pip-opts{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin:8px 0}
+    .v85-pip-opts button{margin:0;padding:9px 4px;font-size:12px;display:flex;flex-direction:column;align-items:center;gap:5px}
+    .v85-pip-opts button.on{border-color:var(--green);color:var(--green2,var(--green));font-weight:800}
+    .v85-pip-opts .shape{display:block;border:2px solid currentColor;border-radius:3px}
     .v85-req{border-left:4px solid var(--green)}
     .v85-ch-foot .v85-att{min-width:44px;padding:0;background:var(--panel2);color:var(--text)}
     .v85-sheet{display:grid;grid-template-columns:1fr 1fr;gap:8px;padding:10px 12px 0;background:var(--panel);border-top:1px solid var(--line)}
@@ -313,34 +337,108 @@
   const v85ShareHtml=()=>`<div class="v85-share"><span style="font-size:28px">📲</span><div class="t"><b>Compartir la app</b><span class="small">Versión libre para quien quiera: registra igual, todo queda en su teléfono.</span></div><button class="secondary" data-v85-share>Compartir</button></div>`;
 
   /* ---------- 4) Ventana flotante (picture-in-picture) ---------- */
+  // 8.5.15: forma elegible (vertical, 3:4, cuadrada, horizontal) y tamaño de letra; vista armada con datos
+  // del entreno (no con el texto de la pantalla), que se adapta sola si agrandas la ventana con dos dedos.
   const v85Pip={ok:false,auto:null};
   try{v85Pip.ok=!!window.NativeStore?.savePhoto?.('__pip__','supported')}catch{}
-  function v85PipPrefs(){data.settings=data.settings||{};return data.settings.pip=Object.assign({auto:true},data.settings.pip||{})}
+  const V85_PIP_SHAPES={'9:16':'Vertical','3:4':'Media','1:1':'Cuadrada','16:9':'Horizontal'};
+  function v85PipPrefs(){data.settings=data.settings||{};const p=data.settings.pip=Object.assign({auto:true,shape:'9:16',text:'md'},data.settings.pip||{});if(!V85_PIP_SHAPES[p.shape])p.shape='9:16';if(!['sm','md','lg'].includes(p.text))p.text='md';return p}
+  const v85PipRatio=()=>v85PipPrefs().shape;
   function v85EnterPip(){
     if(!v85Pip.ok){toast('Tu teléfono no permite ventana flotante para esta app.');return}
     v85Mini(true);
-    try{if(!window.NativeStore.savePhoto('__pip__','enter:9:16')){v85Mini(false);toast('No se pudo abrir la ventana flotante.')}}catch{v85Mini(false)}
+    try{if(!window.NativeStore.savePhoto('__pip__','enter:'+v85PipRatio())){v85Mini(false);toast('No se pudo abrir la ventana flotante.')}}catch{v85Mini(false)}
   }
   function v85Training(){try{return typeof flowPhase!=='undefined'&&flowPhase!=='setup'&&!$('#focusWorkout')?.classList.contains('hidden')}catch{return false}}
   function v85PipWatch(){
     if(!v85Pip.ok)return;
-    const want=!!(v85PipPrefs().auto&&v85Training());
-    if(want!==v85Pip.auto){v85Pip.auto=want;try{window.NativeStore.savePhoto('__pip__',want?'auto:1':'auto:0')}catch{}}
+    const want=!!(v85PipPrefs().auto&&v85Training()),key=want+'|'+v85PipRatio();
+    // Formato "auto:w:h:1": las versiones viejas solo miraban si terminaba en 1.
+    if(key!==v85Pip.auto){v85Pip.auto=key;try{window.NativeStore.savePhoto('__pip__','auto:'+v85PipRatio()+':'+(want?1:0))}catch{}}
     const b=$('#pauseWorkout');if(b&&!$('#v85PipBtn'))b.insertAdjacentHTML('afterend','<button class="secondary" id="v85PipBtn" data-v85-pip title="Seguir viendo el descanso mientras usas otra app">⧉ Ventana flotante</button>');
   }
-  if(!document.getElementById('v85Mini'))document.body.insertAdjacentHTML('beforeend','<div id="v85Mini" aria-hidden="true"><div class="k" id="v85MiK"></div><div class="big" id="v85MiBig"></div><div class="t" id="v85MiT"></div><div class="s" id="v85MiS"></div></div>');
-  let v85MiniTimer=0;
-  function v85Mini(on){document.body.classList.toggle('v85-mini',!!on);clearInterval(v85MiniTimer);if(on){v85MiniFill();v85MiniTimer=setInterval(v85MiniFill,500)}}
-  function v85MiniFill(){
-    const tx=s=>($(s)?.textContent||'').trim(),set=(id,v)=>{const e=document.getElementById(id);if(e&&e.textContent!==v)e.textContent=v};
-    const timer=$('#flowTimer');
-    if(timer){set('v85MiK','Descanso');set('v85MiBig',tx('#flowTimer'));set('v85MiT','');set('v85MiS',tx('#focusContent .focus-subtitle'));return}
-    if(v85Training()){set('v85MiK',tx('#focusContent .focus-kicker')||'Entrenando');set('v85MiBig','');set('v85MiT',tx('#focusContent .focus-title'));set('v85MiS',tx('#focusContent .focus-target')||tx('#focusProgress'));return}
-    set('v85MiK','Mi Progreso');set('v85MiBig',new Date().toLocaleTimeString('es-CO',{hour:'2-digit',minute:'2-digit',hour12:false}));set('v85MiT','');set('v85MiS',v85Chat.unread?`💬 ${v85Chat.unread} mensaje(s) nuevo(s)`:'');
+  if(!document.getElementById('v85Mini'))document.body.insertAdjacentHTML('beforeend','<div id="v85Mini" aria-hidden="true"></div>');
+  let v85MiniTimer=0,v85MiniKey='';
+  function v85Mini(on){document.body.classList.toggle('v85-mini',!!on);clearInterval(v85MiniTimer);v85MiniKey='';if(on){v85MiniFill();v85MiniTimer=setInterval(v85MiniFill,500)}}
+  const v85N=v=>{const n=Number(v);if(!Number.isFinite(n))return '';const r=Math.round(n*100)/100;return Number.isInteger(r)?String(r):String(r).replace('.',',')};
+  const v85U=u=>u==='plates'?'placas':u==='lb'?'lb':'kg';
+  // Carga de una serie en piezas cortas: número grande, unidad y nota (por lado / combinado / asistencia).
+  function v85LoadParts(ex,st){
+    if(!st)return null;
+    const eq=(()=>{try{return setEquipment(st,ex.equipment||'')}catch{return st.equipment||ex.equipment||''}})();
+    const has=st.load!==''&&st.load!=null&&Number(st.load)>0;
+    if(!has)return eq==='Peso corporal'?{big:'Corporal',unit:'',note:''}:{big:'—',unit:'',note:'sin carga previa'};
+    let mode='total';try{mode=loadMode(st,eq)}catch{}
+    const unit=v85U(st.unit||'kg');let note='';
+    if(mode==='per_side'){note='por lado';try{if((st.execution||'bilateral')!=='unilateral')note+=' · '+v85N(totalLoad(st,eq))+' '+unit+' total'}catch{}}
+    else if(mode==='assistance')note='de asistencia';
+    return {big:v85N(st.load),unit,note};
   }
-  // La ventana flotante es angosta: así se detecta al entrar y al salir (también si entró sola).
-  function v85CheckMini(){const small=window.innerWidth<330&&window.innerWidth>0;if(small!==document.body.classList.contains('v85-mini'))v85Mini(small)}
-  window.addEventListener('resize',()=>setTimeout(v85CheckMini,60));
+  function v85SetInfo(ex,i){
+    const st=ex?.sets?.[i];if(!st)return null;
+    const warm=setType(st)==='warmup',sets=ex.sets||[];
+    const pos=warm?sets.slice(0,i+1).filter(x=>setType(x)==='warmup').length:sets.slice(0,i+1).filter(isEffectiveSet).length;
+    const tot=warm?sets.filter(x=>setType(x)==='warmup').length:sets.filter(isEffectiveSet).length;
+    let reps='',rir='';
+    if(warm){reps=Number(st.solo)>0?String(st.solo):'';rir='suave'}
+    else{
+      try{const t=todayTarget(ex,i);if(t&&t.reps)reps=String(t.reps)}catch{}
+      if(!reps&&ex.plannedReps)reps=String(ex.plannedReps);
+      if(!reps&&Number(st.solo)>0)reps=String(st.solo);
+      rir=ex.plannedRir!=null&&ex.plannedRir!==''?String(ex.plannedRir):'';
+    }
+    const kind={drop:'Drop set',restpause:'Rest-pause',failure:'Al fallo'}[setType(st)]||'';
+    return {st,warm,pos,tot,reps,rir,kind,load:v85LoadParts(ex,st)};
+  }
+  function v85MiniHtml(){
+    const P=v85PipPrefs();
+    if(!v85Training()){
+      const hh=new Date().toLocaleTimeString('es-CO',{hour:'2-digit',minute:'2-digit',hour12:false});
+      return {key:'idle|'+hh+'|'+(v85Chat.unread||0),html:`<span class="mpc">Mi Progreso</span><div class="mph timer"><b>${hh}</b></div>${v85Chat.unread?`<div class="mpm">💬 ${v85Chat.unread} mensaje(s) nuevo(s)</div>`:'<div class="mpm">Sin entreno en curso</div>'}`};
+    }
+    let paused=false;try{paused=!!sessionPausedAt}catch{}
+    if(flowPhase==='done')return {key:'done',html:'<span class="mpc rest">Listo</span><div class="mpn">Entrenamiento terminado</div><div class="mpm">Vuelve a la app para guardarlo.</div>'};
+    if(flowPhase==='rest'){
+      let left=0,total=0;try{left=Math.max(0,Math.ceil((timerEnd-Date.now())/1000));total=Number(restOriginalSeconds)||0}catch{}
+      if(paused){try{left=Math.max(0,Math.ceil((Number(pausedRestMs)||0)/1000))}catch{}}
+      const pct=total>0?Math.max(0,Math.min(100,Math.round((1-left/total)*100))):0;
+      let nx='',ni=null;
+      try{const ex=draft.find(x=>x.id===pendingNext?.exerciseId);if(ex){const i=Math.max(0,ex.sets.findIndex(x=>x.id===pendingNext.setId));ni=v85SetInfo(ex,i>=0?i:Number(ex.completedSets)||0);nx=ex.name}}catch{}
+      const prep=ni?.load&&ni.load.big!=='—'?`${ni.load.big}${ni.load.unit?' '+ni.load.unit:''}${ni.load.note?' '+ni.load.note.split(' · ')[0]:''}`:'';
+      const nextHtml=nx?`<div class="mpx">Sigue${ni?` · ${ni.warm?'calentamiento':'serie'} ${ni.pos}/${ni.tot}`:''}<strong>${esc(nx)}</strong>${prep?`Prepara <b style="color:var(--text)">${esc(prep)}</b>`:''}</div>`:'<div class="mpx">Último descanso</div>';
+      return {key:`rest|${left}|${pct}|${nx}|${prep}|${paused}|${P.text}`,html:`<span class="mpc ${paused?'pause':'rest'}">${paused?'⏸ Descanso en pausa':'⏱ Descanso'}</span><div class="mph timer ${left<=10?'low':''}"><b>${timeLabel(left)}</b></div><div class="mpb"><span style="width:${pct}%"></span></div>${nextHtml}`};
+    }
+    let ex=null,info=null;try{syncActiveIndices()}catch{}
+    try{ex=draft[activeExercise];info=v85SetInfo(ex,activeSet)}catch{}
+    if(!ex||!info)return {key:'none',html:'<span class="mpc">Entrenando</span><div class="mpm">Abre la app para elegir el ejercicio.</div>'};
+    const chip=paused?'<span class="mpc pause">⏸ En pausa</span>':info.warm?`<span class="mpc warm">🔥 Calentamiento ${info.pos}/${info.tot}</span>`:`<span class="mpc">Serie ${info.pos}/${info.tot}${info.kind?' · '+esc(info.kind):''}</span>`;
+    const L=info.load,facts=[info.reps?`× ${esc(info.reps)} reps`:'',info.rir&&!info.warm?`RIR ${esc(info.rir)}`:'',info.warm?'Suave, sin fatiga':''].filter(Boolean);
+    const html=`${chip}<div class="mpn">${esc(ex.name)}</div><div class="mph"><b>${esc(L.big)}</b>${L.unit?`<span>${esc(L.unit)}</span>`:''}</div>${L.note?`<div class="mpm">${esc(L.note)}</div>`:''}${facts.length?`<div class="mpf">${facts.map(f=>`<i>${f}</i>`).join('')}</div>`:''}`;
+    return {key:'set|'+html,html};
+  }
+  function v85MiniFill(){
+    const box=document.getElementById('v85Mini');if(!box)return;
+    const t=v85PipPrefs().text;box.classList.toggle('lg',t==='lg');box.classList.toggle('sm',t==='sm');
+    let r;try{r=v85MiniHtml()}catch(e){r={key:'err',html:'<span class="mpc">Mi Progreso</span><div class="mpm">Abre la app para ver el entreno.</div>'}}
+    if(r.key!==v85MiniKey){v85MiniKey=r.key;box.innerHTML=r.html}
+  }
+  // Se detecta la ventana flotante preguntándole al teléfono (si la agrandas puede pasar de 330 px de ancho).
+  function v85PipActive(){try{return !!(v85Pip.ok&&window.NativeStore.savePhoto('__pip__','active'))}catch{return false}}
+  function v85CheckMini(){const small=(window.innerWidth<330&&window.innerWidth>0)||v85PipActive();if(small!==document.body.classList.contains('v85-mini'))v85Mini(small)}
+  window.addEventListener('resize',()=>{setTimeout(v85CheckMini,60);v85MiniKey=''});
+  function v85PipSetHtml(){
+    const P=v85PipPrefs(),sz={'9:16':[12,20],'3:4':[15,20],'1:1':[18,18],'16:9':[24,14]};
+    return `<p class="small" style="margin-top:0">Deja el descanso y la serie en una ventanita encima de otras apps (música, WhatsApp…). Para agrandarla o achicarla: pellizca la ventana con dos dedos o arrastra una esquina.</p>
+      <div class="small"><b>Forma</b></div><div class="v85-pip-opts">${Object.entries(V85_PIP_SHAPES).map(([k,l])=>`<button class="secondary ${P.shape===k?'on':''}" data-v85-pip-shape="${k}"><span class="shape" style="width:${sz[k][0]}px;height:${sz[k][1]}px"></span>${l}</button>`).join('')}</div>
+      <div class="small"><b>Letra</b></div><div class="v85-pip-opts" style="grid-template-columns:repeat(3,1fr)">${[['sm','Pequeña'],['md','Normal'],['lg','Grande']].map(([k,l])=>`<button class="secondary ${P.text===k?'on':''}" data-v85-pip-text="${k}">${l}</button>`).join('')}</div>
+      <button class="secondary" data-v85-pip>Abrir en ventana flotante ahora</button><label class="toggle-row"><input type="checkbox" data-v85-pip-auto ${P.auto?'checked':''}> Durante un entreno, al salir de la app pasar sola a ventana flotante (Android 12 o más)</label>`;
+  }
+  document.addEventListener('click',e=>{
+    const sh=e.target.closest('[data-v85-pip-shape]'),tx=e.target.closest('[data-v85-pip-text]');if(!sh&&!tx)return;
+    const P=v85PipPrefs();if(sh)P.shape=sh.dataset.v85PipShape;if(tx)P.text=tx.dataset.v85PipText;persist(true);v85Pip.auto=null;v85PipWatch();
+    const body=document.getElementById('v85PipBody');if(body)body.innerHTML=v85PipSetHtml();
+    toast(sh?`Ventana: ${V85_PIP_SHAPES[P.shape].toLowerCase()}`:'Letra de la ventana actualizada');
+  });
 
   /* ---------- 5) (Jaider) Aviso dentro de la app cuando Ella pide cambios ---------- */
   async function v85CheckRequests(){
@@ -391,7 +489,7 @@
     try{
       const box=$('#settingsContent');if(!box)return r;
       box.insertAdjacentHTML('afterbegin',v85ShareHtml());
-      const pip=v85Pip.ok?`<details class="settings-group" id="v85PipSet"><summary>⧉ Ventana flotante</summary><div class="settings-section"><p class="small" style="margin-top:0">Deja el descanso y el ejercicio en una ventanita encima de otras apps (música, WhatsApp…).</p><button class="secondary" data-v85-pip>Abrir en ventana flotante ahora</button><label class="toggle-row"><input type="checkbox" data-v85-pip-auto ${v85PipPrefs().auto?'checked':''}> Durante un entreno, al salir de la app pasar sola a ventana flotante (Android 12 o más)</label></div></details>`:'';
+      const pip=v85Pip.ok?`<details class="settings-group" id="v85PipSet"><summary>⧉ Ventana flotante</summary><div class="settings-section" id="v85PipBody">${v85PipSetHtml()}</div></details>`:'';
       const keys=`<details class="settings-group v85-keys" id="v85KeysSet"><summary>🔑 Claves de IA (${v85Pool('groq',(()=>{try{return aiCfg().key||''}catch{return ''}})()).length||0})</summary><div class="settings-section" id="v85KeysBody">${v85KeysHtml()}</div></details>`;
       const chat=v85Code()?`<details class="settings-group"><summary>💬 Chat con ${esc(v85Other())}</summary><div class="settings-section"><p class="small" style="margin-top:0">Escríbanse desde la app. Te aviso con una notificación aunque esté cerrada (puede tardar unos minutos).</p><button class="secondary" data-v85-chat>Abrir chat</button></div></details>`:'';
       const pro=(!V85_ELLA&&v85Code())?`<details class="settings-group" id="v85ProSet"><summary>✦ Códigos Pro (app libre)</summary><div class="settings-section" id="v85ProBody">${v85ProHtml()}</div></details>`:'';

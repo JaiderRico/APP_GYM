@@ -19,7 +19,10 @@
 - `fuente/Pip.java` (8.5.10, en classes7.dex): ventana flotante. La página usa `NativeStore.savePhoto('__pip__', 'supported'|'enter:9:16'|'auto:1'|'auto:0'|'active')`
   (Ext2 lo enruta). El manifiesto de MainActivity tiene `supportsPictureInPicture`, `resizeableActivity` y `configChanges`
   (para que la página no se recargue al entrar/salir de la ventana). La página detecta la ventana angosta (<330 px) y
-  muestra una vista mínima (descanso, ejercicio, siguiente).
+  muestra una vista mínima (descanso, ejercicio, siguiente). Desde 8.5.15 también pregunta `'active'` (la ventana se puede
+  agrandar), la vista se arma con los datos del entreno (`v85MiniHtml`), y en Ajustes se elige forma (`data.settings.pip.shape`:
+  9:16, 3:4, 1:1, 16:9) y letra (`text`: sm/md/lg). El auto-entrar se manda como `auto:w:h:1|0` (Pip.java lo entiende; las
+  versiones viejas solo miraban el último carácter). Ojo: la página ya usa la clase global `.hero`; el bloque usa `.mp*`.
   Para recompilar classes7: `javac --release 8` de Ext2.java + Pip.java (con un stub de QuickWidget), `dalvik-exchange --dex`,
   `baksmali d`, copiar los .smali a `smali_classes7/` del `apktool d` y `apktool b`; luego copiar classes7.dex.
 - `fuente/Chooser.java` (8.5.13, en classes7.dex): el selector de archivos acepta videos. `Extra.configureChooser`
