@@ -1,0 +1,2 @@
+- Pregunta antes de guardar un peso que no cuadra con tu historial; los pesos raros sin confirmar no cuentan como récord.
+- El récord de “más repeticiones” solo cuenta con el mismo peso.

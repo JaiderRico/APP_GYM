@@ -1,0 +1,3 @@
+- Pesos raros: si al terminar una serie el peso no cuadra con lo que sueles usar en ese ejercicio (un cero de más, kg/lb o “por lado”/“total” confundidos), la app te pregunta antes de guardarla.
+- Un peso raro que no confirmes no cuenta como récord, ni en Logros ni en las gráficas. En Logros hay una lista de los que encontró en tu historial; si alguno era real, tócalo en “Era correcto”.
+- El récord de “más repeticiones” ahora solo cuenta con el mismo peso (antes bajar el peso podía dar un récord falso).

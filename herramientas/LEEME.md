@@ -1,8 +1,10 @@
 # Cómo modificar Mi Progreso (guía para Claude u otra persona)
 
 ## Qué hay aquí
+**Son TRES apps** y cada cambio va en las tres, salvo que se pida otra cosa: **Mi Progreso** (Jaider), **Mi Progreso Ella** y
+**Mi Progreso Libre** (pública). En cada versión: `mp.py publicar` (Jaider + Ella) **y** `mp.py libre` con el mismo número.
 - Dos apps Android tipo WebView: **Mi Progreso** (Jaider, `com.jaider.gimnasio`) y **Mi Progreso Ella** (`com.jaider.gimnasio.ella`).
-- Una tercera, pública: **Mi Progreso Libre** (`com.jaider.gimnasio.libre`, desde 8.5.10). Es la app de Jaider sin nada que
+- La tercera, pública: **Mi Progreso Libre** (`com.jaider.gimnasio.libre`, desde 8.5.10). Es la app de Jaider sin nada que
   se conecte con nosotros (sin código, sin Apps Script, sin IA, sin chat, sin sus datos): todo queda en el teléfono.
   Tiene cuestionario inicial (objetivo, experiencia, días, lugar, prioridades, creatina) que arma la rutina y consejos
   genéricos. Lo de IA y nube es "Pro": se activa con un código temporal (ver Códigos Pro abajo). Se genera sola con `mp.py libre` (ver Pasos) desde
@@ -34,6 +36,11 @@
 - `fuente/v850_comun.js`: el bloque 8.5.10 que va en las dos apps (antes de `initV7();`): chat, varias claves de IA,
   compartir la app libre, ventana flotante y (Jaider) aviso de pedidos de Ella. Si lo cambias, vuelve a pegarlo en los
   dos `index.html` reemplazando el bloque anterior.
+- `fuente/v860_registros.js` (8.5.16): pesos raros. Va en los dos `index.html` justo después del bloque v8.5.0 (antes de
+  `initV7();`); la libre lo hereda de la de Jaider. Al terminar una serie, si el peso no cuadra con las últimas sesiones del mismo
+  ejercicio (kg totales; lb→kg, "por lado"×2; placas aparte) pregunta con `confirm`; confirmado queda `st.loadOk=true` (también
+  en `draftWorkout`). Los raros sin confirmar se quitan de `getPRsAgainst`, `recordEvents`, `exGroups`, `evaluateSetPR`,
+  `recordPoints` y `bestBeforeVariant`, y Logros los lista con "Era correcto". Si lo cambias, pégalo de nuevo en los dos.
 - `fuente/QuickWidget.java`, `fuente/Qw*.java`, `fuente/Ext2.java` (8.4.18, dentro de las APK como classes7.dex):
   un widget por acceso rápido (Entrenar, Comida, Creatina, Peso, Fotos, Historial y, en la de Ella, Mi ciclo), redimensionables,
   y los controles de música. La página llega a ellos con `NativeStore.savePhoto('__media__', 'toggle|next|prev|active')`
@@ -51,7 +58,7 @@
 2. Edita `trabajo/<app>/assets/index.html`. Comprueba la sintaxis de los `<script>` con `node --check`.
 3. `python3 herramientas/mp.py publicar X.Y.Z --notas "- cambio"` (sin `--clave`: las APK quedan sin firmar).
    La versión debe ser mayor y con la misma cantidad de caracteres (8.4.18, 8.4.19 … 8.4.99 → 8.5.10).
-4. Si la app libre debe llevar los cambios de la de Jaider: `python3 herramientas/mp.py libre X.Y.Z --notas "- cambio"`
+4. Siempre (son tres apps) publica también la libre con el mismo número: `python3 herramientas/mp.py libre X.Y.Z --notas "- cambio"`
    (después del paso 3; deja `publica/vX.Y.Z/MiProgreso_Libre_vX.Y.Z.apk` sin firmar). Si falla diciendo que no encontró
    un texto, es que cambió en la app de Jaider: ajusta `libre_html()` en mp.py.
 5. `git add releases/vX.Y.Z publica/vX.Y.Z && git commit && git push origin HEAD:main`. El workflow las **firma con el secreto FIRMA_PEM**,
