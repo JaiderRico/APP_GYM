@@ -1,0 +1,6 @@
+- 📱 Widgets nuevos: uno por cada acceso rápido (Entrenar, Comida, Creatina, Peso, Fotos, Historial; en la app de Ella también Mi ciclo). Pon solo los que quieras y cámbiales el tamaño
+- 🎵 Controles de música dentro de la app: pausar, pasar o devolver la canción sin salirte
+- 🤖 La IA ya no recomienda descansos de menos de 3 minutos ni subir el volumen semanal
+- 🔧 Corrección de datos sospechosos con la IA: te muestra qué cambiaría y tú decides
+- 🎨 (Ella) Colores propios, ciclo que aprende de tus registros y te pregunta ese día, y pedidos de cambios para la app
+- ⚙️ Los ajustes por ejercicio quedan como opcionales (y ocultos en la app de Ella)

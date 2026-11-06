@@ -1,5 +1,5 @@
 // ============================================================================
-// BACKEND MI PROGRESO v13 — Google Apps Script (respaldo en Drive + app de Ella)
+// BACKEND MI PROGRESO v14 — Google Apps Script (respaldo en Drive + app de Ella)
 // ============================================================================
 // NOVEDAD v12 — DATOS POR USUARIO:
 //   La app de Ella (8.4.13+) manda app:'ella' en cada llamada. Con eso el backend sabe
@@ -14,6 +14,9 @@
 // ============================================================================
 // Carpeta "Mi Progreso v8.0":
 // https://drive.google.com/drive/folders/1hUkPHwACKs533vFBA0_D4VymitggIXKD
+//
+// v14: pedidos de cambios para la app de Ella (send_request / get_requests / update_request /
+//      delete_request). Ella anota lo que quiere que cambie y Jaider lo ve y lo marca.
 //
 // v13: las claves viven en "Propiedades del script" y GitHub Actions publica este archivo
 //      solo (workflow "Actualizar Apps Script") cuando cambia en el repo.
@@ -46,6 +49,10 @@
 //   list_photos    { code }                       -> fotos respaldadas                 (Ella o admin)
 //   get_photo      { code, id }                   -> una foto (para recuperarla)       (Ella o admin)
 //   pending_notifications { code, app? }       -> novedades para notificar con la app cerrada
+//   send_request   { code, app, id, text }        -> Ella pide un cambio para su app    (Ella o admin)
+//   get_requests   { code, app? }                 -> pedidos (Ella: los suyos; Jaider: todos)
+//   update_request { code, id, status, note }     -> Jaider marca un pedido             (solo admin)
+//   delete_request { code, app?, id }             -> borra un pedido (Ella los suyos; admin cualquiera)
 //   backup / sin action -> respaldo clásico (igual que antes)
 //   (Con app:'ella' + código admin, las acciones de Ella usan el usuario "prueba".)
 // ============================================================================
@@ -62,7 +69,7 @@ function prop_(k, respaldo) {
 const CODIGO_ELLA  = prop_('CODIGO_ELLA',  "TU_CODIGO_SECRETO_AQUI");
 const CODIGO_ADMIN = prop_('CODIGO_ADMIN', "TU_CODIGO_ADMIN");
 const GROQ_API_KEY = prop_('GROQ_API_KEY', "TU_API_KEY_DE_GROQ");
-const BACKEND_VERSION = 'v13';
+const BACKEND_VERSION = 'v14';
 function clavesConfiguradas_() {
   return CODIGO_ELLA !== "TU_CODIGO_SECRETO_AQUI" && CODIGO_ADMIN !== "TU_CODIGO_ADMIN";
 }
@@ -89,6 +96,9 @@ const MY_FILE     = 'progreso_jaider.json';
 const MSG_FILE    = 'mensajes_motivacion.json';
 const ROUTINE_FILE = 'rutinas_para_ella.json';
 const MAX_RUTINAS = 60;
+const REQUEST_FILE = 'pedidos_app_ella.json';
+const MAX_PEDIDOS = 150;
+const ESTADOS_PEDIDO = ['pendiente', 'en_proceso', 'hecho', 'descartado'];
 const PHOTO_DIR = 'Fotos_Ella';
 const MAX_FOTO_BYTES = 8 * 1024 * 1024;
 // Archivos que ya escriben las apps 8.1 (se usan como respaldo si el nuevo aún no existe)
@@ -227,6 +237,23 @@ function saveMessages(folder, list) {
   list.sort(function (a, b) { return (a.timestamp || 0) - (b.timestamp || 0); });
   if (list.length > MAX_MENSAJES) list = list.slice(list.length - MAX_MENSAJES);
   upsertFile(folder, MSG_FILE, JSON.stringify({ updatedAt: new Date().toISOString(), messages: list }, null, 2));
+  return list;
+}
+
+// ============================================================================
+// Pedidos de cambios (app de Ella)
+// ============================================================================
+function loadRequests(folder) {
+  const f = findFile(folder, REQUEST_FILE);
+  if (!f) return [];
+  const d = readJsonFile(f);
+  return (d && Array.isArray(d.requests)) ? d.requests : [];
+}
+
+function saveRequests(folder, list) {
+  list.sort(function (a, b) { return (a.createdAt || 0) - (b.createdAt || 0); });
+  if (list.length > MAX_PEDIDOS) list = list.slice(list.length - MAX_PEDIDOS);
+  upsertFile(folder, REQUEST_FILE, JSON.stringify({ updatedAt: new Date().toISOString(), requests: list }, null, 2));
   return list;
 }
 
@@ -445,6 +472,77 @@ const ACTIONS = {
     return { ok: true, removed: removed };
   },
 
+  send_request: function (body, folder) {
+    const role = requireRole(body, 'any');
+    const text = String(body.text || '').trim().slice(0, MAX_TEXTO_MENSAJE);
+    if (!text) throw new Error('El pedido está vacío');
+    const user = userOf(body, role);
+    const req = {
+      id: String(body.id || Utilities.getUuid()).slice(0, 64),
+      user: user,
+      text: text,
+      createdAt: Number(body.createdAt) || Date.now(),
+      status: 'pendiente',
+      note: '',
+      updatedAt: null
+    };
+    let saved = req;
+    withLock(function () {
+      const list = loadRequests(folder);
+      const prev = list.filter(function (r) { return String(r.id) === req.id; })[0];
+      if (prev) { saved = prev; return; }          // reintento de un envío que ya llegó
+      list.push(req);
+      saveRequests(folder, list);
+    });
+    return { ok: true, request: saved };
+  },
+
+  get_requests: function (body, folder) {
+    const role = requireRole(body, 'any');
+    let list = loadRequests(folder);
+    if (fromHerApp(body) || role !== 'admin') {
+      const user = userOf(body, role);
+      list = list.filter(function (r) { return (r.user || 'ella') === user; });
+    }
+    return { ok: true, requests: list.slice().reverse() };
+  },
+
+  update_request: function (body, folder) {
+    requireRole(body, 'admin');
+    const status = String(body.status || '');
+    if (ESTADOS_PEDIDO.indexOf(status) < 0) throw new Error('Estado inválido');
+    let found = null;
+    withLock(function () {
+      const list = loadRequests(folder);
+      list.forEach(function (r) {
+        if (String(r.id) !== String(body.id)) return;
+        r.status = status;
+        if (body.note !== undefined) r.note = String(body.note || '').slice(0, MAX_TEXTO_MENSAJE);
+        r.updatedAt = Date.now();
+        found = r;
+      });
+      if (found) saveRequests(folder, list);
+    });
+    if (!found) return { ok: false, error: 'Pedido no encontrado' };
+    return { ok: true, request: found };
+  },
+
+  delete_request: function (body, folder) {
+    const role = requireRole(body, 'any');
+    const user = userOf(body, role);
+    const admin = role === 'admin' && !fromHerApp(body);
+    let removed = 0;
+    withLock(function () {
+      const list = loadRequests(folder);
+      const keep = list.filter(function (r) {
+        return !(String(r.id) === String(body.id) && (admin || (r.user || 'ella') === user));
+      });
+      removed = list.length - keep.length;
+      if (removed) saveRequests(folder, keep);
+    });
+    return { ok: true, removed: removed };
+  },
+
   backup_photo: function (body, folder) {
     const u = userCfg(body, requireRole(body, 'any'));
     const id = String(body.id || '').replace(/[^a-zA-Z0-9_-]/g, '').slice(0, 40);
@@ -513,11 +611,23 @@ const ACTIONS = {
       ((rf && readJsonFile(rf).routines) || []).map(tester ? viewAsTester : withoutTest).forEach(function (r) {
         if (!r.imported) items.push({ id: 'rut:' + r.id, title: '📋 Jaider te mandó una rutina', text: r.title + (r.note ? ' · ' + r.note : ''), action: 'go:home' });
       });
+      const yo = userOf(body, role);
+      loadRequests(folder).forEach(function (q) {
+        if ((q.user || 'ella') !== yo || !q.updatedAt || q.status === 'pendiente') return;
+        if (Date.now() - Number(q.updatedAt) > 36 * 3600000) return;
+        const t = q.status === 'hecho' ? '✅ Tu pedido para la app está listo' : q.status === 'en_proceso' ? '🛠 Jaider está trabajando en tu pedido' : '💡 Jaider revisó tu pedido';
+        items.push({ id: 'ped:' + q.id + ':' + q.status, title: t, text: q.text + (q.note ? ' · ' + q.note : ''), action: 'go:requests' });
+      });
     } else if (role === 'admin') {
       loadMessages(folder).forEach(function (m) {
         const r = m.reply;
         if (!r || Date.now() - Date.parse(r.at || 0) > 36 * 3600000) return;
         items.push({ id: 'rep:' + m.id + ':' + r.at, title: '💬 Ella respondió tu mensaje', text: ((r.emoji || '') + ' ' + (r.text || '')).trim() || 'Reaccionó a tu mensaje', action: 'go:home' });
+      });
+      loadRequests(folder).forEach(function (q) {
+        if ((q.user || 'ella') !== 'ella' || q.status !== 'pendiente') return;
+        if (Date.now() - Number(q.createdAt || 0) > 36 * 3600000) return;
+        items.push({ id: 'ped:' + q.id, title: '💡 Ella pidió un cambio para su app', text: q.text, action: 'go:requests' });
       });
       const hf = newestFile(folder, [HER_FILE].concat(HER_LEGACY_FILES));
       if (hf && Date.now() - hf.getLastUpdated().getTime() < 36 * 3600000) {
@@ -594,5 +704,6 @@ function probarConfiguracion() {
   Logger.log('Mensajes guardados: ' + loadMessages(folder).length);
   Logger.log('progreso_ella.json: ' + (findFile(folder, HER_FILE) ? 'sí' : 'aún no'));
   Logger.log('progreso_prueba.json: ' + (findFile(folder, USUARIOS.prueba.file) ? 'sí' : 'aún no'));
+  Logger.log('Pedidos de la app de Ella: ' + loadRequests(folder).length);
   Logger.log('Códigos configurados: ' + clavesConfiguradas_());
 }
