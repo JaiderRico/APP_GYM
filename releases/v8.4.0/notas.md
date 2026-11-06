@@ -1,0 +1,6 @@
+- 🎨 Temas de color: Rosa, Rosa intenso, Lavanda, Coral, Menta y Océano
+- ⏰ El descanso del modo libre suena aunque el teléfono esté bloqueado
+- 📶 Lo que envías sin internet se manda solo al volver la conexión
+- 📸 Copia opcional de tus fotos de progreso en Drive (y recuperarlas)
+- 🔐 Mi Progreso pide el código de administrador al instalarse
+- ✨ Diseño más limpio y actualizaciones más confiables
