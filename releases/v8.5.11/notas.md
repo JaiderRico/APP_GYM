@@ -1,0 +1,2 @@
+- ✦ (Jaider) Códigos Pro para la app libre: créalos en Ajustes con nombre y días, compártelos, alárgalos o desactívalos
+- (Ella) Sin cambios visibles: se actualiza para ir a la par con la de Jaider

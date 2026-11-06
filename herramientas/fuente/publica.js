@@ -1,7 +1,10 @@
   /* ===================== Mi Progreso Libre: versión pública, sin conexión con nuestras apps ===================== */
   // Se genera con "python3 herramientas/mp.py libre X.Y.Z" a partir de la app de Jaider:
-  // todo se guarda solo en el teléfono, sin IA, sin nube, sin chat y sin el backend de Apps Script.
-  const PUB_PRO_TXT='Las funciones Pro (entrenador con IA, copia en la nube y chat) son de pago. Si las quieres, pídele el acceso a quien te compartió la app.';
+  // todo se guarda solo en el teléfono, sin IA, sin nube, sin chat. Solo con un código Pro vigente (que crea Jaider
+  // desde su app) se habla con el Apps Script: pro_verify / pro_sync / pro_get, nunca con los datos de Jaider o de Ella.
+  const PUB_PRO_TXT='Las funciones Pro (entrenador con IA y copia en la nube) son de pago. Si las quieres, pídele un código a quien te compartió la app.';
+  const PUB_PRO_URL='https://script.google.com/macros/s/AKfycbwrlaJgyxtAS2uAUG4snTyA6EvFBYG17XtA5brvHYJWEvRL7clCg5lrhV2oILhdMcn7/exec';
+  const PUB_PRO_KEY='mp_pro_v1';
   document.head.insertAdjacentHTML('beforeend',`<style id="pubcss">
     #hmEntry,#v85ChatBtn,.pv-tabs,#backupDriveCard,#cloudCard,[data-hm-open],[data-partner-open]{display:none!important}
     .pub-gate{position:fixed;inset:0;z-index:9500;background:var(--bg);overflow-y:auto;display:flex;align-items:flex-start;justify-content:center;padding:calc(env(safe-area-inset-top,0px) + 28px) 18px 28px}
@@ -33,21 +36,110 @@
   try{const s=s81();s.partner.driveUrl='';s.partner.code='';s.partner.upload=false;s.partner.notify=false;s.reminders.meals=false}catch{}
   try{if(typeof saveCloudCfg==='function')saveCloudCfg({url:'',auto:false})}catch{}
 
-  /* ---------- IA: es de pago ---------- */
+  /* ---------- Pro: código temporal que valida el Apps Script ---------- */
+  function pubProSt(){try{return JSON.parse(localStorage.getItem(PUB_PRO_KEY)||'{}')||{}}catch{return {}}}
+  function pubProSave(st){try{localStorage.setItem(PUB_PRO_KEY,JSON.stringify(st))}catch{}try{window.NativeStore?.savePhoto?.('kv_'+PUB_PRO_KEY,JSON.stringify(st))}catch{}}
+  // Si borran el almacenamiento web, el código se recupera del almacenamiento nativo
+  try{if(!localStorage.getItem(PUB_PRO_KEY)){const n=window.NativeStore?.loadPhoto?.('kv_'+PUB_PRO_KEY);if(n)localStorage.setItem(PUB_PRO_KEY,n)}}catch{}
+  function pubProOn(){const st=pubProSt();return !!(st.code&&Number(st.expiresAt)>Date.now())}
+  const pubFecha=ts=>new Date(Number(ts)||0).toLocaleDateString('es-CO',{day:'numeric',month:'long',year:'numeric'});
+  async function pubProCall(action,extra={},code=pubProSt().code){
+    const r=await nxHttp('POST',PUB_PRO_URL,{'Content-Type':'text/plain;charset=utf-8'},JSON.stringify({action,pro:code,...extra}));
+    if(r.status<0)throw new Error('Sin conexión. Revisa tu internet.');
+    let j;try{j=JSON.parse(r.text)}catch{throw new Error('No se pudo conectar con el servidor.')}
+    if(!j.ok){const e=new Error(j.error||'Error del servidor');e.auth=/c[oó]digo pro|venci|desactivado|inv[aá]lido/i.test(j.error||'');throw e}
+    return j;
+  }
+  function pubProKeys(keys){
+    keys=(keys||[]).filter(k=>/^gsk_/.test(k));
+    try{localStorage.setItem('mp_ai_keys_srv_v1',JSON.stringify(keys))}catch{}
+    const c=aiCfg();aiSaveCfg({...c,provider:'groq',model:c.provider==='groq'?(c.model||''):'',key:keys[0]||''});
+  }
+  function pubProOff(msg){
+    const had=!!pubProSt().code;pubProSave({});pubProKeys([]);
+    if(had&&msg)toast(msg);pubHome();try{if(!$('#settingsModal')?.classList.contains('hidden'))renderSettings()}catch{}
+  }
+  async function pubProActivate(code,{quiet=false}={}){
+    code=String(code||'').trim().toUpperCase();if(!code)throw new Error('Escribe tu código.');
+    const j=await pubProCall('pro_verify',{},code);
+    const prev=pubProSt();pubProSave({...(prev.code===code?prev:{}),code,name:j.name,expiresAt:j.expiresAt,verifiedAt:Date.now()});pubProKeys(j.groqKeys);
+    if(!quiet){toast('✦ ¡Pro activado!');pubHome();await pubProOfferRestore()}
+    return j;
+  }
+  async function pubProVerify(){
+    const st=pubProSt();if(!st.code)return;
+    if(Number(st.expiresAt)<=Date.now()){pubProOff('Tu acceso Pro venció. Sigues con la versión gratis y tus datos están intactos.');return}
+    if(Date.now()-(Number(st.verifiedAt)||0)<6*3600000)return;
+    try{await pubProActivate(st.code,{quiet:true});const left=(Number(pubProSt().expiresAt)-Date.now())/86400000;if(left<3)toast(`✦ Tu Pro vence en ${Math.max(1,Math.ceil(left))} día(s).`)}
+    catch(e){if(e.auth)pubProOff(e.message+'. Sigues con la versión gratis y tus datos están intactos.')}
+  }
+  // Copia en la nube: sube lo que cambió (como mucho cada 3 min) y al salir de la app.
+  let pubSyncBusy=false;
+  async function pubProSync(force){
+    if(!pubProOn()||pubSyncBusy)return false;const st=pubProSt(),saved=Number(data.savedAt)||0;
+    if(!force&&(saved<=(Number(st.lastSync)||0)||Date.now()-(Number(st.lastTry)||0)<3*60000))return false;
+    pubSyncBusy=true;pubProSave({...st,lastTry:Date.now()});
+    try{await pubProCall('pro_sync',{payload:data});pubProSave({...pubProSt(),lastSync:Math.max(saved,1),lastSyncAt:Date.now()});return true}
+    catch(e){if(e.auth)pubProOff(e.message+'. Sigues con la versión gratis.');if(force)throw e;return false}
+    finally{pubSyncBusy=false}
+  }
+  async function pubProOfferRestore(){
+    try{
+      const j=await pubProCall('pro_get');const obj=typeof j.payload==='string'?JSON.parse(j.payload):j.payload;
+      const n=(obj&&Array.isArray(obj.workouts))?obj.workouts.length:0;
+      if(n>(data.workouts||[]).length&&confirm(`Tienes una copia en la nube del ${pubFecha(Date.parse(j.updatedAt))} con ${n} entrenamiento(s). ¿Recuperarla en este teléfono?`))pubProApply(obj);
+    }catch{}
+  }
+  async function pubProRestore(){
+    try{const j=await pubProCall('pro_get');const obj=typeof j.payload==='string'?JSON.parse(j.payload):j.payload;
+      if(!obj||!Array.isArray(obj.workouts))throw new Error('La copia no es válida.');
+      if(confirm(`¿Reemplazar lo de este teléfono por la copia del ${pubFecha(Date.parse(j.updatedAt))} (${obj.workouts.length} entrenamiento(s))?`))pubProApply(obj);
+    }catch(e){toast(e.message||'No se pudo recuperar.')}
+  }
+  function pubProApply(obj){
+    try{saveBackupVersion('Antes de recuperar la copia Pro')}catch{}
+    data=migrateData(obj);persist(true);flushNativeSave();pubProSave({...pubProSt(),lastSync:Number(data.savedAt)||Date.now()});
+    toast('✓ Copia recuperada');setTimeout(()=>location.reload(),600);
+  }
+  setInterval(()=>pubProSync(false),60000);
+  document.addEventListener('visibilitychange',()=>{if(document.hidden){const st=pubProSt();if(pubProOn()&&(Number(data.savedAt)||0)>(Number(st.lastSync)||0))pubProSave({...st,lastTry:0});pubProSync(false)}});
+
+  /* ---------- IA: solo con Pro ---------- */
+  const _pubAiAsk=aiAsk,_pubAiVision=aiVision;
   function pubPro(){
     $('#pubPro')?.remove();
-    document.body.insertAdjacentHTML('beforeend',`<div class="modal" id="pubPro" role="dialog" aria-modal="true"><div class="modal-panel"><div class="modal-head"><div><h2 style="margin:0">✦ Mi Progreso Pro</h2><div class="small">Funciones de pago</div></div><button class="secondary" data-pub-pro-close>Cerrar</button></div>
-      <p>${esc(PUB_PRO_TXT)}</p><ul class="small" style="padding-left:18px;margin:0 0 12px"><li>Entrenador con IA: arma y ajusta tus rutinas y analiza tus entrenos.</li><li>Copia automática en la nube para no perder nada.</li><li>Chat y seguimiento con tu entrenador.</li></ul>
-      <p class="small">Todo lo demás es gratis y sin límites: rutinas, series, descansos, récords, comidas, peso y fotos. Tus datos se quedan en tu teléfono.</p>
-      <div class="modal-actions"><button class="primary" style="flex:1" data-pub-pro-close>Entendido</button></div></div></div>`);
+    const on=pubProOn(),st=pubProSt();
+    const body=on?`<div class="pub-plan" style="margin-bottom:12px"><b>✦ Pro activo${st.name?' · '+esc(st.name):''}</b><span>Vence el ${esc(pubFecha(st.expiresAt))}${st.lastSyncAt?` · última copia en la nube: ${esc(new Date(st.lastSyncAt).toLocaleString('es-CO',{day:'numeric',month:'short',hour:'numeric',minute:'2-digit'}))}`:''}</span></div>
+        <p class="small">Tienes el entrenador con IA y tu copia se guarda sola en la nube.</p>
+        <div class="modal-actions" style="flex-wrap:wrap"><button class="secondary" style="flex:1" data-pub-pro-sync>☁️ Subir copia ahora</button><button class="secondary" style="flex:1" data-pub-pro-restore>⬇ Recuperar copia</button></div>
+        <div class="modal-actions"><button class="secondary danger" style="flex:1" data-pub-pro-quit>Quitar el código de este teléfono</button></div>`
+      :`<p>${esc(PUB_PRO_TXT)}</p><ul class="small" style="padding-left:18px;margin:0 0 12px"><li>Entrenador con IA: arma y ajusta tus rutinas y analiza tus entrenos.</li><li>Copia automática en la nube para no perder nada si cambias de teléfono.</li></ul>
+        <label class="small"><b>¿Ya tienes un código?</b></label><input id="pubProCode" autocomplete="off" autocapitalize="characters" placeholder="MP-XXXX-XXXX" style="width:100%;padding:12px;border-radius:12px;border:1px solid var(--line);background:var(--panel2);color:var(--text);font:700 17px monospace;letter-spacing:.08em;margin:6px 0 4px"><p class="small" id="pubProErr" style="color:#ffb4a2;min-height:18px;margin:0"></p>
+        <div class="modal-actions"><button class="primary" style="flex:1" data-pub-pro-go>Activar Pro</button></div>
+        <p class="small">Todo lo demás es gratis y sin límites: rutinas, series, descansos, récords, comidas, peso y fotos. Tus datos se quedan en tu teléfono.</p>`;
+    document.body.insertAdjacentHTML('beforeend',`<div class="modal" id="pubPro" role="dialog" aria-modal="true"><div class="modal-panel"><div class="modal-head"><div><h2 style="margin:0">✦ Mi Progreso Pro</h2><div class="small">${on?'Activo':'Funciones de pago'}</div></div><button class="secondary" data-pub-pro-close>Cerrar</button></div>${body}</div></div>`);
   }
   openAiModal=function(){pubPro()};
-  aiAsk=async function(){pubPro();throw new Error('Función Pro')};
-  aiVision=async function(){pubPro();throw new Error('Función Pro')};
-  document.addEventListener('click',e=>{
-    if(e.target.closest('[data-pub-pro-close]')){$('#pubPro')?.remove();return}
-    if(e.target.closest('#aiBtn,#aiTrainingBtn,[data-ai],[data-ai-plan],[data-ai-routine]')){e.preventDefault();e.stopImmediatePropagation();pubPro()}
+  aiAsk=async function(){if(pubProOn())return _pubAiAsk.apply(this,arguments);pubPro();throw new Error('Función Pro')};
+  aiVision=async function(){if(pubProOn())return _pubAiVision.apply(this,arguments);pubPro();throw new Error('Función Pro')};
+  async function pubProGo(inputSel,errSel,btn){
+    const code=($(inputSel)?.value||'').trim(),err=$(errSel);if(!code){$(inputSel)?.focus();return false}
+    if(btn){btn.disabled=true;btn.dataset.t=btn.textContent;btn.textContent='Verificando…'}if(err)err.textContent='';
+    try{await pubProActivate(code);return true}
+    catch(e){if(err)err.textContent=e.auth?(e.message||'Código inválido'):(e.message||'No se pudo verificar.');return false}
+    finally{if(btn){btn.disabled=false;btn.textContent=btn.dataset.t||'Activar'}}
+  }
+  document.addEventListener('click',async e=>{
+    const t=e.target;
+    if(t.closest('[data-pub-pro-close]')){$('#pubPro')?.remove();return}
+    if(t.closest('[data-pub-pro-go]')){if(await pubProGo('#pubProCode','#pubProErr',t.closest('button'))){$('#pubPro')?.remove()}return}
+    if(t.closest('[data-pub-pro-sync]')){const b=t.closest('button');b.disabled=true;try{await pubProSync(true);toast('☁️ Copia guardada en la nube')}catch(er){toast(er.message||'No se pudo subir.')}pubPro();return}
+    if(t.closest('[data-pub-pro-restore]')){pubProRestore();return}
+    if(t.closest('[data-pub-pro-quit]')){if(confirm('¿Quitar el código Pro de este teléfono? Tus datos se quedan.')){pubProOff('Código quitado.');$('#pubPro')?.remove()}return}
+    if(t.closest('#aiBtn')){e.preventDefault();e.stopImmediatePropagation();pubPro();return}
+    if(!pubProOn()&&t.closest('#aiTrainingBtn,[data-ai],[data-ai-plan],[data-ai-routine]')){e.preventDefault();e.stopImmediatePropagation();pubPro()}
   },true);
+  document.addEventListener('keydown',e=>{if(e.key==='Enter'&&e.target.id==='pubProCode'){e.preventDefault();$('[data-pub-pro-go]')?.click()}});
 
   /* ---------- Cuestionario inicial y plan genérico ---------- */
   function pubPrefs(){data.settings=data.settings||{};return data.settings.publica=Object.assign({done:false,name:'',goal:'',level:'',days:0,place:'',prio:[],creatina:false},data.settings.publica||{})}
@@ -120,7 +212,7 @@
   }
 
   let pubOn={i:0,a:null};
-  const PUB_STEPS=['hi','name','goal','level','days','place','prio','creatina','done'];
+  const PUB_STEPS=['hi','code','name','goal','level','days','place','prio','creatina','done'];
   function pubGateEl(){let g=$('#pubGate');if(!g){document.body.insertAdjacentHTML('beforeend','<div class="pub-gate" id="pubGate" role="dialog" aria-modal="true"></div>');g=$('#pubGate')}return g}
   function pubShowOnboarding(){const p=pubPrefs();pubOn={i:0,a:{name:p.name||'',goal:p.goal||'',level:p.level||'',days:p.days||0,place:p.place||'',prio:(p.prio||[]).slice(),creatina:!!p.creatina}};pubRender()}
   function pubOpts(key,map){return `<div class="pub-opts">${Object.entries(map).map(([k,[ic,t,s]])=>`<button data-pub-pick="${key}" data-v="${k}" class="${pubOn.a[key]===k?'on':''}"><span style="font-size:24px">${ic}</span><span><b>${esc(t)}</b><span>${esc(s)}</span></span></button>`).join('')}</div>`}
@@ -128,6 +220,8 @@
     const k=PUB_STEPS[pubOn.i],a=pubOn.a,dots=`<div class="pub-dots">${PUB_STEPS.map((_,i)=>`<i class="${i<=pubOn.i?'on':''}"></i>`).join('')}</div>`;
     let h='';
     if(k==='hi')h=`<div class="pub-q">💪</div><h1>Bienvenido a Mi Progreso</h1><p>Te hago 6 preguntas rápidas y te armo una rutina para empezar. Todo se guarda solo en tu teléfono.</p><button class="pub-btn" data-pub-next>Empezar</button>`;
+    if(k==='code')h=pubProOn()?`<div class="pub-q">✦</div><h1>¡Pro activo!</h1><p>Tienes el entrenador con IA y la copia en la nube${pubProSt().name?', '+esc(pubProSt().name):''}. Vence el ${esc(pubFecha(pubProSt().expiresAt))}.</p><button class="pub-btn" data-pub-next>Continuar</button>`
+      :`<div class="pub-q">🔑</div><h1>¿Tienes un código de acceso?</h1><p>Si te dieron un código Pro, escríbelo para activar el entrenador con IA y la copia en la nube. Si no, sigue gratis.</p><input id="pubOnbCode" autocomplete="off" autocapitalize="characters" placeholder="MP-XXXX-XXXX" style="font-family:monospace;font-weight:700;letter-spacing:.08em"><p class="small" id="pubOnbErr" style="color:#ffb4a2;min-height:18px;margin:-6px 0 6px"></p><button class="pub-btn" data-pub-code-go>Activar</button><button class="pub-ghost" data-pub-next style="margin-top:4px">No tengo código, seguir gratis</button>`;
     if(k==='name')h=`<div class="pub-q">👋</div><h1>¿Cómo te llamas?</h1><p>Opcional, para saludarte.</p><input id="pubName" maxlength="30" autocomplete="off" value="${esc(a.name)}" placeholder="Tu nombre"><button class="pub-btn" data-pub-next>Continuar</button>`;
     if(k==='goal')h=`<div class="pub-q">🎯</div><h1>¿Cuál es tu objetivo principal?</h1>${pubOpts('goal',PUB_GOALS)}`;
     if(k==='level')h=`<div class="pub-q">📊</div><h1>¿Cuánta experiencia tienes?</h1>${pubOpts('level',PUB_LEVELS)}`;
@@ -151,11 +245,12 @@
     const pk=t.closest('[data-pub-pick]');if(pk){const key=pk.dataset.pubPick;pubOn.a[key]=key==='days'?Number(pk.dataset.v):key==='creatina'?pk.dataset.v==='si':pk.dataset.v;if(key==='creatina')pubOn.a._c=1;pubRender();setTimeout(pubNext,180);return}
     const pr=t.closest('[data-pub-prio]');if(pr){const v=pr.dataset.pubPrio,L=pubOn.a.prio;const i=L.indexOf(v);if(i>=0)L.splice(i,1);else L.push(v);pubRender();return}
     if(t.closest('[data-pub-finish]')){pubFinish();return}
+    if(t.closest('[data-pub-code-go]')){pubProGo('#pubOnbCode','#pubOnbErr',t.closest('button')).then(ok=>{if(ok&&$('#pubGate')){if(pubPrefs().done)$('#pubGate')?.remove();else pubNext()}});return}
     if(t.closest('[data-pub-redo]')){try{closeM('settingsModal')}catch{}pubShowOnboarding();return}
     if(t.closest('[data-pub-pro]')){pubPro();return}
     if(t.closest('[data-pub-hide-pro]')){pubPrefs().hidePro=true;persist(true);$('#pubProCard')?.remove();return}
   });
-  document.addEventListener('keydown',e=>{if(e.key==='Enter'&&e.target.id==='pubName'){e.preventDefault();pubNext()}});
+  document.addEventListener('keydown',e=>{if(e.key==='Enter'&&e.target.id==='pubName'){e.preventDefault();pubNext()}if(e.key==='Enter'&&e.target.id==='pubOnbCode'){e.preventDefault();$('[data-pub-code-go]')?.click()}});
 
   /* ---------- Inicio: consejo del día y Pro ---------- */
   function pubHome(){
@@ -164,7 +259,7 @@
     if(!p.done)return;
     const anchor=home.querySelector('.hero');
     const tip=`<div class="card pub-tip" id="pubTipCard"><strong>💡 Consejo del día${p.name?' para '+esc(p.name):''}</strong><p class="small" style="margin:6px 0 0">${esc(pubTipsFor(p,1)[0])}</p></div>`;
-    const pro=p.hidePro?'':`<div class="card pub-pro" id="pubProCard"><div class="row between"><strong>✦ ¿Quieres un entrenador con IA?</strong><button class="linkbtn" data-pub-hide-pro aria-label="Ocultar">✕</button></div><p class="small" style="margin:6px 0 10px">Rutinas que se ajustan solas, análisis de tus entrenos y copia en la nube. Es de pago.</p><button class="secondary" data-pub-pro>Ver qué incluye</button></div>`;
+    const pro=pubProOn()?`<div class="card pub-pro" id="pubProCard" data-pub-pro role="button" style="cursor:pointer"><strong>✦ Pro activo</strong><span class="small"> · vence el ${esc(pubFecha(pubProSt().expiresAt))}</span></div>`:p.hidePro?'':`<div class="card pub-pro" id="pubProCard"><div class="row between"><strong>✦ ¿Quieres un entrenador con IA?</strong><button class="linkbtn" data-pub-hide-pro aria-label="Ocultar">✕</button></div><p class="small" style="margin:6px 0 10px">Rutinas que se ajustan solas, análisis de tus entrenos y copia en la nube. Es de pago.</p><button class="secondary" data-pub-pro>Ver qué incluye</button></div>`;
     if(anchor)anchor.insertAdjacentHTML('afterend',tip+pro);else home.insertAdjacentHTML('afterbegin',tip+pro);
   }
 
@@ -178,7 +273,7 @@
       box.querySelectorAll('[data-hm-share],[data-hm-open]').forEach(x=>x.closest('label,div')?.remove());
       const p=pubPrefs();
       box.insertAdjacentHTML('afterbegin',`<details class="settings-group" open><summary>🎯 Mi plan</summary><div class="settings-section"><p class="small" style="margin-top:0">${p.done?`${esc(PUB_GOALS[p.goal]?.[1]||'')} · ${p.days} días · ${esc(PUB_PLACES[p.place]?.[1]||'')}`:'Aún no has hecho el cuestionario.'}</p><button class="secondary" data-pub-redo>Rehacer el cuestionario</button><p class="small">Al rehacerlo se reemplazan las rutinas que armó la app (las tuyas no se tocan). Tu historial no cambia.</p></div></details>
-        <div class="v85-share" style="border-style:dashed"><span style="font-size:28px">✦</span><div class="t"><b>Mi Progreso Pro</b><span class="small">IA, nube y chat (de pago).</span></div><button class="secondary" data-pub-pro>Ver</button></div>`);
+        <div class="v85-share" style="border-style:dashed"><span style="font-size:28px">✦</span><div class="t"><b>Mi Progreso Pro</b><span class="small">${pubProOn()?`Activo · vence el ${esc(pubFecha(pubProSt().expiresAt))}`:'IA y copia en la nube (de pago). Aquí escribes tu código.'}</span></div><button class="secondary" data-pub-pro>${pubProOn()?'Ver':'Código'}</button></div>`);
     }catch(e){console.error(e)}
     return r;
   };
@@ -192,5 +287,6 @@
   const _rnaPub=runNativeAction;
   runNativeAction=function(a){if(a==='partner'||a==='go:requests'||a.startsWith('go:chat'))return go('home');return _rnaPub(a)};
 
-  setTimeout(()=>{$('#adminGate')?.remove();try{renderToday()}catch{}if(!pubPrefs().done)pubShowOnboarding();else pubHome()},60);
+  setTimeout(()=>{$('#adminGate')?.remove();try{renderToday()}catch{}if(!pubPrefs().done)pubShowOnboarding();else pubHome();pubProVerify()},60);
+  setInterval(pubProVerify,30*60000);
   const _pubGo=go;go=function(s){const r=_pubGo.apply(this,arguments);if(s==='home')setTimeout(pubHome,30);return r};

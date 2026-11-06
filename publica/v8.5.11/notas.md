@@ -1,0 +1,3 @@
+- 🔑 Código de acceso Pro: al abrir la app (o en Ajustes) escribe tu código para activar el entrenador con IA
+- ☁️ Con Pro, tu progreso se guarda solo en la nube y lo puedes recuperar en otro teléfono
+- Al vencer el código sigues gratis con todos tus datos

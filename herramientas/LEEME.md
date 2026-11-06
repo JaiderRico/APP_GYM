@@ -5,7 +5,7 @@
 - Una tercera, pública: **Mi Progreso Libre** (`com.jaider.gimnasio.libre`, desde 8.5.10). Es la app de Jaider sin nada que
   se conecte con nosotros (sin código, sin Apps Script, sin IA, sin chat, sin sus datos): todo queda en el teléfono.
   Tiene cuestionario inicial (objetivo, experiencia, días, lugar, prioridades, creatina) que arma la rutina y consejos
-  genéricos; lo de IA/nube/chat muestra "Pro, de pago". Se genera sola con `mp.py libre` (ver Pasos) desde
+  genéricos. Lo de IA y nube es "Pro": se activa con un código temporal (ver Códigos Pro abajo). Se genera sola con `mp.py libre` (ver Pasos) desde
   `trabajo/jaider` + `fuente/publica.js`. Va en `publica/vX.Y.Z/` y el workflow **Publicar app libre** la sube al Release
   fijo `publica` (pre-release, nunca Latest) como `MiProgreso_Libre.apk`. Enlace que comparten las apps:
   https://github.com/JaiderRico/APP_GYM/releases/download/publica/MiProgreso_Libre.apk
@@ -63,4 +63,10 @@
 - Claves de IA (backend v15): `GROQ_API_KEY`, `GROQ_API_KEY_2`, `GROQ_API_KEY_3`… (hasta _9) o `GROQ_API_KEYS` (separadas
   por comas) en Propiedades del script. `verify_code` devuelve `groqKeys`; las apps las traen cada 12 h (o con
   Ajustes → 🔑 Claves de IA → Traer del servidor) y si una responde 429/401/403 reintentan con la siguiente.
+- Códigos Pro (backend v16, app libre 8.5.11+): Jaider los crea en su app → Ajustes → ✦ Códigos Pro (nombre + días);
+  se guardan en la propiedad del script `PRO_CODIGOS` (no en Drive, para que nadie más los vea) y vencen solos.
+  Con un código vigente la app libre llama a `pro_verify` (recibe las claves de IA), `pro_sync` (sube su copia cada vez que
+  cambia, máx. cada 3 min) y `pro_get` (recuperar). Cada persona tiene su carpeta `<nombre> (<id>)` dentro de
+  "Mi Progreso - Usuarios Pro" en la raíz de Mi unidad (`PRO_FOLDER_ID`), fuera de la carpeta compartida con Ella.
+  Al vencer o desactivarse, la app libre borra las claves y vuelve a gratis sin tocar sus datos.
 - Backend: edítalo en `herramientas/fuente/MiProgreso_Backend.gs`, pruébalo (node --check y, si puedes, con un simulador de DriveApp) y haz push; revisa que "Actualizar Apps Script" termine en verde. Nunca escribas claves reales en el archivo. Mantén compatibles las acciones que ya usan las apps instaladas.

@@ -1,5 +1,5 @@
 // ============================================================================
-// BACKEND MI PROGRESO v15 — Google Apps Script (respaldo en Drive + app de Ella)
+// BACKEND MI PROGRESO v16 — Google Apps Script (respaldo en Drive + app de Ella)
 // ============================================================================
 // NOVEDAD v12 — DATOS POR USUARIO:
 //   La app de Ella (8.4.13+) manda app:'ella' en cada llamada. Con eso el backend sabe
@@ -14,6 +14,11 @@
 // ============================================================================
 // Carpeta "Mi Progreso v8.0":
 // https://drive.google.com/drive/folders/1hUkPHwACKs533vFBA0_D4VymitggIXKD
+//
+// v16: códigos Pro para la app pública "Mi Progreso Libre". Jaider los crea desde su app (nombre + días),
+//      quedan en las Propiedades del script (PRO_CODIGOS, nadie más los ve) y vencen solos. Con un código
+//      vigente la app libre usa la IA (tus claves) y guarda su copia en su propia carpeta, dentro de
+//      "Mi Progreso - Usuarios Pro" en la raíz de tu Drive (NO en la carpeta compartida).
 //
 // v15: varias claves de Groq (GROQ_API_KEY, GROQ_API_KEY_2, GROQ_API_KEY_3… o GROQ_API_KEYS
 //      separadas por comas): verify_code devuelve groqKeys y las apps pasan a la siguiente cuando
@@ -63,6 +68,13 @@
 //   chat_read      { code, app?, thread?, upTo? }    -> marca el chat como leído        (Ella o admin)
 //     · App de Ella con su código -> chat "ella"; con el código admin (prueba) -> chat "prueba".
 //     · App de Jaider -> chat "ella" (o thread:'prueba' para ver el de prueba).
+//   pro_create     { code, name, days }           -> crea un código Pro temporal        (solo admin)
+//   pro_list       { code }                       -> códigos Pro y su estado            (solo admin)
+//   pro_update     { code, id, days?, revoke? }   -> alarga / revoca / reactiva         (solo admin)
+//   pro_delete     { code, id }                   -> borra el código (la carpeta queda)  (solo admin)
+//   pro_verify     { pro }                        -> { ok, name, expiresAt, groqKeys }  (app libre)
+//   pro_sync       { pro, payload }               -> copia en su carpeta                (app libre)
+//   pro_get        { pro }                        -> su última copia                    (app libre)
 //   backup / sin action -> respaldo clásico (igual que antes)
 //   (Con app:'ella' + código admin, las acciones de Ella usan el usuario "prueba".)
 // ============================================================================
@@ -81,7 +93,7 @@ function prop_(k, respaldo) {
 const CODIGO_ELLA  = prop_('CODIGO_ELLA',  "TU_CODIGO_SECRETO_AQUI");
 const CODIGO_ADMIN = prop_('CODIGO_ADMIN', "TU_CODIGO_ADMIN");
 const GROQ_API_KEY = prop_('GROQ_API_KEY', "TU_API_KEY_DE_GROQ");
-const BACKEND_VERSION = 'v15';
+const BACKEND_VERSION = 'v16';
 // Todas las claves de Groq configuradas, sin repetir y en orden (la principal primero).
 function groqKeys_() {
   const out = [];
@@ -318,6 +330,68 @@ function chatWho(body, role) {
 function chatUnread(t, side) {
   const seen = Number(t.read[side]) || 0;
   return t.messages.filter(function (m) { return m.from !== side && Number(m.ts) > seen; });
+}
+
+// ============================================================================
+// Códigos Pro (app libre) — v16
+// ============================================================================
+const PRO_PROP = 'PRO_CODIGOS';
+const PRO_ROOT_NAME = 'Mi Progreso - Usuarios Pro';
+const PRO_MAX_DIAS = 400;
+const PRO_LETRAS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';   // sin 0/O ni 1/I
+
+function proLoad() {
+  try { const v = PropertiesService.getScriptProperties().getProperty(PRO_PROP); const d = v ? JSON.parse(v) : []; return Array.isArray(d) ? d : []; }
+  catch (e) { return []; }
+}
+function proSave(list) { PropertiesService.getScriptProperties().setProperty(PRO_PROP, JSON.stringify(list)); }
+function proNorm(c) { return String(c || '').toUpperCase().replace(/[^A-Z0-9]/g, ''); }
+function proNewCode(list) {
+  for (let t = 0; t < 50; t++) {
+    let c = 'MP';
+    for (let i = 0; i < 8; i++) c += PRO_LETRAS.charAt(Math.floor(Math.random() * PRO_LETRAS.length));
+    if (!list.some(function (x) { return proNorm(x.code) === c; })) return c.slice(0, 2) + '-' + c.slice(2, 6) + '-' + c.slice(6);
+  }
+  throw new Error('No se pudo generar un código');
+}
+function proStatus(x) { return x.revoked ? 'revocado' : (Number(x.expiresAt) <= Date.now() ? 'vencido' : 'activo'); }
+function proPublic(x) {
+  return { id: x.id, name: x.name, code: x.code, createdAt: x.createdAt, expiresAt: x.expiresAt, revoked: !!x.revoked,
+    status: proStatus(x), lastUse: x.lastUse || 0, lastBackup: x.lastBackup || 0 };
+}
+// Carpeta raíz de los usuarios Pro: en "Mi unidad", fuera de la carpeta compartida.
+function proRootFolder() {
+  const props = PropertiesService.getScriptProperties();
+  const id = props.getProperty('PRO_FOLDER_ID');
+  if (id) { try { return DriveApp.getFolderById(id); } catch (e) { } }
+  const it = DriveApp.getRootFolder().getFoldersByName(PRO_ROOT_NAME);
+  const f = it.hasNext() ? it.next() : DriveApp.getRootFolder().createFolder(PRO_ROOT_NAME);
+  props.setProperty('PRO_FOLDER_ID', f.getId());
+  return f;
+}
+function proFolder(x) {
+  const root = proRootFolder();
+  const name = (String(x.name || 'usuario').replace(/[\\/:*?"<>|]+/g, ' ').trim().slice(0, 40) || 'usuario') + ' (' + x.id + ')';
+  const it = root.getFoldersByName(name);
+  return it.hasNext() ? it.next() : root.createFolder(name);
+}
+// Valida el código Pro que manda la app libre; devuelve el registro (y la lista para guardar cambios).
+function requirePro(body) {
+  const c = proNorm(body.pro);
+  if (!c) throw new Error('Falta el código Pro');
+  const list = proLoad();
+  const x = list.filter(function (r) { return proNorm(r.code) === c; })[0];
+  if (!x) { const e = new Error('Código Pro inválido'); throw e; }
+  if (x.revoked) throw new Error('Este código Pro fue desactivado');
+  if (Number(x.expiresAt) <= Date.now()) throw new Error('Tu código Pro venció');
+  return { x: x, list: list };
+}
+function proTouch(id, fields) {
+  withLock(function () {
+    const list = proLoad();
+    list.forEach(function (r) { if (r.id === id) Object.keys(fields).forEach(function (k) { r[k] = fields[k]; }); });
+    proSave(list);
+  });
 }
 
 // ============================================================================
@@ -701,6 +775,85 @@ const ACTIONS = {
     return { ok: true, readAt: at };
   },
 
+  pro_create: function (body) {
+    requireRole(body, 'admin');
+    const name = String(body.name || '').trim().slice(0, 40);
+    if (!name) throw new Error('Escribe el nombre de la persona');
+    const days = Math.max(1, Math.min(PRO_MAX_DIAS, Math.round(Number(body.days) || 30)));
+    let rec = null;
+    withLock(function () {
+      const list = proLoad();
+      rec = { id: Utilities.getUuid().replace(/-/g, '').slice(0, 8), name: name, code: proNewCode(list),
+        createdAt: Date.now(), expiresAt: Date.now() + days * 86400000, revoked: false, lastUse: 0, lastBackup: 0 };
+      list.push(rec);
+      proSave(list);
+    });
+    return { ok: true, pro: proPublic(rec) };
+  },
+
+  pro_list: function (body) {
+    requireRole(body, 'admin');
+    return { ok: true, codes: proLoad().map(proPublic).reverse() };
+  },
+
+  pro_update: function (body) {
+    requireRole(body, 'admin');
+    let found = null;
+    withLock(function () {
+      const list = proLoad();
+      list.forEach(function (r) {
+        if (r.id !== String(body.id)) return;
+        if (body.revoke === true || body.revoke === 'true') r.revoked = true;
+        if (body.revoke === false || body.revoke === 'false') r.revoked = false;
+        const d = Number(body.days) || 0;
+        if (d) r.expiresAt = Math.max(Date.now(), Number(r.expiresAt) || 0) + Math.max(1, Math.min(PRO_MAX_DIAS, d)) * 86400000;
+        found = r;
+      });
+      if (found) proSave(list);
+    });
+    if (!found) return { ok: false, error: 'Código no encontrado' };
+    return { ok: true, pro: proPublic(found) };
+  },
+
+  pro_delete: function (body) {
+    requireRole(body, 'admin');
+    let removed = 0;
+    withLock(function () {
+      const list = proLoad(), keep = list.filter(function (r) { return r.id !== String(body.id); });
+      removed = list.length - keep.length;
+      if (removed) proSave(keep);
+    });
+    return { ok: true, removed: removed };
+  },
+
+  pro_verify: function (body) {
+    const x = requirePro(body).x;
+    proTouch(x.id, { lastUse: Date.now() });
+    return { ok: true, name: x.name, expiresAt: x.expiresAt, groqKeys: groqKeys_() };
+  },
+
+  pro_sync: function (body) {
+    const x = requirePro(body).x;
+    if (body.payload == null) throw new Error('Falta payload');
+    const content = toContent(body.payload);
+    if (content.length > 20 * 1024 * 1024) throw new Error('La copia es demasiado grande');
+    withLock(function () {
+      const dir = proFolder(x);
+      upsertFile(dir, 'progreso.json', content);
+      upsertFile(getHistoryFolder(dir), 'progreso_' + todayStr() + '.json', content);
+    });
+    const now = Date.now();
+    proTouch(x.id, { lastUse: now, lastBackup: now });
+    return { ok: true, updatedAt: new Date(now).toISOString(), expiresAt: x.expiresAt };
+  },
+
+  pro_get: function (body) {
+    const x = requirePro(body).x;
+    const f = findFile(proFolder(x), 'progreso.json');
+    if (!f) return { ok: false, error: 'Aún no tienes copia en la nube.' };
+    return { ok: true, updatedAt: f.getLastUpdated().toISOString(), payload: readJsonFile(f) };
+  },
+
   // Comprobación para la automatización de GitHub (no revela ninguna clave).
   health: function () {
     return { ok: true, version: BACKEND_VERSION, clavesConfiguradas: clavesConfiguradas_(), clavesIA: groqKeys_().length };
@@ -828,5 +981,6 @@ function probarConfiguracion() {
   Logger.log('Pedidos de la app de Ella: ' + loadRequests(folder).length);
   Logger.log('Códigos configurados: ' + clavesConfiguradas_());
   Logger.log('Claves de IA configuradas: ' + groqKeys_().length);
+  Logger.log('Códigos Pro: ' + proLoad().length + ' (carpeta: ' + PRO_ROOT_NAME + ')');
   Logger.log('Mensajes en el chat: ' + (chatThread(loadChat(folder), 'ella').messages.length));
 }

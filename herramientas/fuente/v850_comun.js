@@ -228,6 +228,29 @@
     $('#home')?.insertAdjacentHTML('afterbegin',`<div class="card v85-req" id="v85ReqCard"><div class="row between"><strong>💡 ${esc(v85Other())} pidió ${L.length>1?L.length+' cambios':'un cambio'} para su app</strong></div>${L.map(r=>`<p class="small" style="margin:6px 0 0;white-space:pre-wrap">“${esc(String(r.text).slice(0,180))}”</p>`).join('')}<div class="row" style="gap:8px;margin-top:10px"><button class="primary" style="flex:1;margin:0" data-v85-req-open>Ver pedidos</button><button class="secondary" style="flex:1;margin:0" data-v85-req-ok>Listo</button></div></div>`);
   }
 
+  /* ---------- 6) (Jaider) Códigos Pro para la app libre ---------- */
+  const v85Pro={list:null,busy:false,err:''};
+  const V85_PRO_ST={activo:'✅ Activo',vencido:'⌛ Vencido',revocado:'⛔ Desactivado'};
+  const v85Fecha=ts=>new Date(Number(ts)||0).toLocaleDateString('es-CO',{day:'numeric',month:'short',year:'numeric'});
+  function v85ProHtml(){
+    const L=v85Pro.list;
+    const form=`<p class="small" style="margin-top:0">Con un código vigente, la app libre usa la IA (con tus claves) y guarda su copia en su propia carpeta de tu Drive: “Mi Progreso - Usuarios Pro”, fuera de la carpeta compartida. Al vencer vuelve a la versión gratis sin perder sus datos. Los códigos solo los ves tú.</p>
+      <div class="row" style="gap:8px;flex-wrap:nowrap"><input id="v85ProName" maxlength="40" placeholder="Nombre de la persona" autocomplete="off" style="flex:2;min-width:0;padding:11px;border-radius:12px;border:1px solid var(--line);background:var(--panel2);color:var(--text);font:inherit"><select id="v85ProDays" style="flex:1;min-width:0;padding:11px;border-radius:12px;border:1px solid var(--line);background:var(--panel2);color:var(--text);font:inherit"><option value="7">7 días</option><option value="30" selected>30 días</option><option value="90">90 días</option><option value="365">1 año</option></select></div>
+      <button class="primary" data-v85-pro-new style="margin-top:8px;width:100%">Crear código</button>`;
+    if(v85Pro.err)return form+`<p class="small" style="color:#ffb4a2">${esc(v85Pro.err)}</p>`;
+    if(!L)return form+'<p class="small">Cargando códigos…</p>';
+    if(!L.length)return form+'<p class="small">Aún no has creado códigos.</p>';
+    return form+L.map(c=>`<div class="rq" style="margin-top:8px"><div class="row between"><b>${esc(c.name)}</b><span class="small">${V85_PRO_ST[c.status]||esc(c.status)}</span></div>
+      <div style="font:700 18px/1.3 monospace;letter-spacing:.06em;margin:4px 0">${esc(c.code)}</div>
+      <small>${c.status==='vencido'?'Venció':'Vence'} el ${esc(v85Fecha(c.expiresAt))}${c.lastBackup?` · última copia ${esc(v85Fecha(c.lastBackup))}`:c.lastUse?` · lo usó el ${esc(v85Fecha(c.lastUse))}`:' · aún sin usar'}</small>
+      <div class="rq-btns"><button class="secondary" data-v85-pro-share="${esc(c.id)}">Compartir</button><button class="secondary" data-v85-pro-days="${esc(c.id)}">+30 días</button>${c.revoked?`<button class="secondary" data-v85-pro-on="${esc(c.id)}">Reactivar</button>`:`<button class="secondary" data-v85-pro-off="${esc(c.id)}">Desactivar</button>`}<button class="secondary danger" data-v85-pro-del="${esc(c.id)}">Borrar</button></div></div>`).join('');
+  }
+  function v85ProPaint(){const b=$('#v85ProBody');if(b)b.innerHTML=v85ProHtml()}
+  async function v85ProLoad(){if(V85_ELLA||!v85Code())return;v85Pro.err='';try{const j=await gas('pro_list');v85Pro.list=j.codes||[]}catch(e){v85Pro.err=e.message||'No se pudo cargar.'}v85ProPaint()}
+  function v85ProShareText(c){return `🔑 Tu código Pro de Mi Progreso: ${c.code}\nVence el ${v85Fecha(c.expiresAt)}.\n\nEscríbelo en la app Mi Progreso Libre: al abrirla te lo pregunta, o en Ajustes ⚙ → Mi Progreso Pro.\n\nSi aún no tienes la app (Android):\n${V85_PUBLIC_URL}`}
+  async function v85ProAct(fn,okMsg){if(v85Pro.busy)return;v85Pro.busy=true;try{await fn();if(okMsg)toast(okMsg)}catch(e){toast(e.message||'No se pudo guardar.')}finally{v85Pro.busy=false;v85ProPaint()}}
+  const v85ProSet=r=>{v85Pro.list=(v85Pro.list||[]).map(x=>x.id===r.id?r:x)};
+
   /* ---------- Ajustes ---------- */
   const _rs850=renderSettings;
   renderSettings=function(){
@@ -238,7 +261,9 @@
       const pip=v85Pip.ok?`<details class="settings-group" id="v85PipSet"><summary>⧉ Ventana flotante</summary><div class="settings-section"><p class="small" style="margin-top:0">Deja el descanso y el ejercicio en una ventanita encima de otras apps (música, WhatsApp…).</p><button class="secondary" data-v85-pip>Abrir en ventana flotante ahora</button><label class="toggle-row"><input type="checkbox" data-v85-pip-auto ${v85PipPrefs().auto?'checked':''}> Durante un entreno, al salir de la app pasar sola a ventana flotante (Android 12 o más)</label></div></details>`:'';
       const keys=`<details class="settings-group v85-keys" id="v85KeysSet"><summary>🔑 Claves de IA (${v85Pool('groq',(()=>{try{return aiCfg().key||''}catch{return ''}})()).length||0})</summary><div class="settings-section" id="v85KeysBody">${v85KeysHtml()}</div></details>`;
       const chat=v85Code()?`<details class="settings-group"><summary>💬 Chat con ${esc(v85Other())}</summary><div class="settings-section"><p class="small" style="margin-top:0">Escríbanse desde la app. Te aviso con una notificación aunque esté cerrada (puede tardar unos minutos).</p><button class="secondary" data-v85-chat>Abrir chat</button></div></details>`:'';
-      box.insertAdjacentHTML('beforeend',chat+pip+keys);
+      const pro=(!V85_ELLA&&v85Code())?`<details class="settings-group" id="v85ProSet"><summary>✦ Códigos Pro (app libre)</summary><div class="settings-section" id="v85ProBody">${v85ProHtml()}</div></details>`:'';
+      box.insertAdjacentHTML('beforeend',chat+pro+pip+keys);
+      $('#v85ProSet')?.addEventListener('toggle',e=>{if(e.target.open)v85ProLoad()});
     }catch(e){console.error(e)}
     return r;
   };
@@ -256,6 +281,13 @@
     if(t.closest('[data-v85-keys-sync]')){v85SyncKeys(true).then(ok=>{const b=$('#v85KeysBody');if(b)b.innerHTML=v85KeysHtml();toast(ok?'✓ Claves actualizadas':'No se pudo conectar con el servidor.')});return}
     if(t.closest('[data-v85-req-open]')){v85Chat.reqNew=[];$('#v85ReqCard')?.remove();try{openRequests()}catch{}return}
     if(t.closest('[data-v85-req-ok]')){v85Chat.reqNew=[];$('#v85ReqCard')?.remove();return}
+    if(t.closest('[data-v85-pro-new]')){const name=($('#v85ProName')?.value||'').trim(),days=Number($('#v85ProDays')?.value)||30;if(!name){toast('Escribe el nombre de la persona.');$('#v85ProName')?.focus();return}
+      v85ProAct(async()=>{const j=await gas('pro_create',{name,days});v85Pro.list=[j.pro,...(v85Pro.list||[])];const n=$('#v85ProName');if(n)n.value='';v85ProPaint();try{NX?.shareText?.(v85ProShareText(j.pro))}catch{}},'✓ Código creado');return}
+    const ps=t.closest('[data-v85-pro-share]');if(ps){const c=(v85Pro.list||[]).find(x=>x.id===ps.dataset.v85ProShare);if(c){try{if(NX?.shareText){NX.shareText(v85ProShareText(c));return}}catch{}prompt('Copia el código:',c.code)}return}
+    const pd=t.closest('[data-v85-pro-days]');if(pd){v85ProAct(async()=>{const j=await gas('pro_update',{id:pd.dataset.v85ProDays,days:30});v85ProSet(j.pro)},'✓ 30 días más');return}
+    const pf=t.closest('[data-v85-pro-off]');if(pf){if(!confirm('¿Desactivar este código? La persona vuelve a la versión gratis (sus datos se quedan).'))return;v85ProAct(async()=>{const j=await gas('pro_update',{id:pf.dataset.v85ProOff,revoke:true});v85ProSet(j.pro)},'Código desactivado');return}
+    const po=t.closest('[data-v85-pro-on]');if(po){v85ProAct(async()=>{const j=await gas('pro_update',{id:po.dataset.v85ProOn,revoke:false});v85ProSet(j.pro)},'✓ Código reactivado');return}
+    const px=t.closest('[data-v85-pro-del]');if(px){if(!confirm('¿Borrar este código? Su carpeta en Drive no se borra.'))return;v85ProAct(async()=>{await gas('pro_delete',{id:px.dataset.v85ProDel});v85Pro.list=(v85Pro.list||[]).filter(x=>x.id!==px.dataset.v85ProDel)},'Código borrado');return}
   });
   document.addEventListener('change',e=>{if(e.target.matches('[data-v85-pip-auto]')){v85PipPrefs().auto=e.target.checked;persist(true);v85Pip.auto=null;v85PipWatch()}});
   document.addEventListener('keydown',e=>{if(e.target.id==='v85ChInput'&&e.key==='Enter'&&!e.shiftKey){e.preventDefault();v85Send()}});
