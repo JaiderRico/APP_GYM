@@ -1,5 +1,5 @@
 // ============================================================================
-// BACKEND MI PROGRESO v16 — Google Apps Script (respaldo en Drive + app de Ella)
+// BACKEND MI PROGRESO v17 — Google Apps Script (respaldo en Drive + app de Ella)
 // ============================================================================
 // NOVEDAD v12 — DATOS POR USUARIO:
 //   La app de Ella (8.4.13+) manda app:'ella' en cada llamada. Con eso el backend sabe
@@ -14,6 +14,10 @@
 // ============================================================================
 // Carpeta "Mi Progreso v8.0":
 // https://drive.google.com/drive/folders/1hUkPHwACKs533vFBA0_D4VymitggIXKD
+//
+// v17: cada código Pro sirve en UN solo teléfono. El primero que lo activa queda amarrado (device);
+//      otro teléfono recibe "Este código ya está en uso en otro teléfono". Jaider lo libera con
+//      pro_update { release:true } para que la persona lo pase a un teléfono nuevo.
 //
 // v16: códigos Pro para la app pública "Mi Progreso Libre". Jaider los crea desde su app (nombre + días),
 //      quedan en las Propiedades del script (PRO_CODIGOS, nadie más los ve) y vencen solos. Con un código
@@ -70,11 +74,11 @@
 //     · App de Jaider -> chat "ella" (o thread:'prueba' para ver el de prueba).
 //   pro_create     { code, name, days }           -> crea un código Pro temporal        (solo admin)
 //   pro_list       { code }                       -> códigos Pro y su estado            (solo admin)
-//   pro_update     { code, id, days?, revoke? }   -> alarga / revoca / reactiva         (solo admin)
+//   pro_update     { code, id, days?, revoke?, release? } -> alarga / revoca / reactiva / libera el teléfono (solo admin)
 //   pro_delete     { code, id }                   -> borra el código (la carpeta queda)  (solo admin)
-//   pro_verify     { pro }                        -> { ok, name, expiresAt, groqKeys }  (app libre)
-//   pro_sync       { pro, payload }               -> copia en su carpeta                (app libre)
-//   pro_get        { pro }                        -> su última copia                    (app libre)
+//   pro_verify     { pro, device }                -> { ok, name, expiresAt, groqKeys }  (app libre; amarra el teléfono)
+//   pro_sync       { pro, device, payload }       -> copia en su carpeta                (app libre)
+//   pro_get        { pro, device }                -> su última copia                    (app libre)
 //   backup / sin action -> respaldo clásico (igual que antes)
 //   (Con app:'ella' + código admin, las acciones de Ella usan el usuario "prueba".)
 // ============================================================================
@@ -93,7 +97,7 @@ function prop_(k, respaldo) {
 const CODIGO_ELLA  = prop_('CODIGO_ELLA',  "TU_CODIGO_SECRETO_AQUI");
 const CODIGO_ADMIN = prop_('CODIGO_ADMIN', "TU_CODIGO_ADMIN");
 const GROQ_API_KEY = prop_('GROQ_API_KEY', "TU_API_KEY_DE_GROQ");
-const BACKEND_VERSION = 'v16';
+const BACKEND_VERSION = 'v17';
 // Todas las claves de Groq configuradas, sin repetir y en orden (la principal primero).
 function groqKeys_() {
   const out = [];
@@ -357,7 +361,8 @@ function proNewCode(list) {
 function proStatus(x) { return x.revoked ? 'revocado' : (Number(x.expiresAt) <= Date.now() ? 'vencido' : 'activo'); }
 function proPublic(x) {
   return { id: x.id, name: x.name, code: x.code, createdAt: x.createdAt, expiresAt: x.expiresAt, revoked: !!x.revoked,
-    status: proStatus(x), lastUse: x.lastUse || 0, lastBackup: x.lastBackup || 0 };
+    status: proStatus(x), lastUse: x.lastUse || 0, lastBackup: x.lastBackup || 0,
+    device: !!x.device, deviceAt: x.deviceAt || 0, blockedAt: x.blockedAt || 0 };
 }
 // Carpeta raíz de los usuarios Pro: en "Mi unidad", fuera de la carpeta compartida.
 function proRootFolder() {
@@ -384,8 +389,15 @@ function requirePro(body) {
   if (!x) { const e = new Error('Código Pro inválido'); throw e; }
   if (x.revoked) throw new Error('Este código Pro fue desactivado');
   if (Number(x.expiresAt) <= Date.now()) throw new Error('Tu código Pro venció');
-  return { x: x, list: list };
+  const dev = proDevice(body);
+  if (!dev) throw new Error('Actualiza Mi Progreso Libre para usar tu código Pro');
+  if (x.device && x.device !== dev) {
+    proTouch(x.id, { blockedAt: Date.now() });   // Jaider ve que alguien más lo intentó usar
+    throw new Error('Este código Pro ya está en uso en otro teléfono');
+  }
+  return { x: x, list: list, device: dev };
 }
+function proDevice(body) { return String(body.device || '').replace(/[^a-zA-Z0-9_-]/g, '').slice(0, 64); }
 function proTouch(id, fields) {
   withLock(function () {
     const list = proLoad();
@@ -805,6 +817,7 @@ const ACTIONS = {
         if (r.id !== String(body.id)) return;
         if (body.revoke === true || body.revoke === 'true') r.revoked = true;
         if (body.revoke === false || body.revoke === 'false') r.revoked = false;
+        if (body.release === true || body.release === 'true') { r.device = ''; r.deviceAt = 0; r.blockedAt = 0; }
         const d = Number(body.days) || 0;
         if (d) r.expiresAt = Math.max(Date.now(), Number(r.expiresAt) || 0) + Math.max(1, Math.min(PRO_MAX_DIAS, d)) * 86400000;
         found = r;
@@ -827,7 +840,19 @@ const ACTIONS = {
   },
 
   pro_verify: function (body) {
-    const x = requirePro(body).x;
+    const v = requirePro(body), x = v.x;
+    if (!x.device) {
+      // Primer teléfono: se amarra (con candado, por si dos lo activan al mismo tiempo)
+      let taken = false;
+      withLock(function () {
+        const list = proLoad(), r = list.filter(function (q) { return q.id === x.id; })[0];
+        if (!r) return;
+        if (r.device && r.device !== v.device) { taken = true; return; }
+        r.device = v.device; r.deviceAt = Date.now();
+        proSave(list);
+      });
+      if (taken) throw new Error('Este código Pro ya está en uso en otro teléfono');
+    }
     proTouch(x.id, { lastUse: Date.now() });
     return { ok: true, name: x.name, expiresAt: x.expiresAt, groqKeys: groqKeys_() };
   },

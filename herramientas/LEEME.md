@@ -69,4 +69,7 @@
   cambia, máx. cada 3 min) y `pro_get` (recuperar). Cada persona tiene su carpeta `<nombre> (<id>)` dentro de
   "Mi Progreso - Usuarios Pro" en la raíz de Mi unidad (`PRO_FOLDER_ID`), fuera de la carpeta compartida con Ella.
   Al vencer o desactivarse, la app libre borra las claves y vuelve a gratis sin tocar sus datos.
+  Desde v17 cada código sirve en UN teléfono: la app libre manda un `device` aleatorio y el primero que hace `pro_verify`
+  queda amarrado; otro teléfono recibe "ya está en uso en otro teléfono". Jaider lo libera con "Liberar teléfono"
+  (`pro_update {release:true}`) cuando la persona cambia de teléfono.
 - Backend: edítalo en `herramientas/fuente/MiProgreso_Backend.gs`, pruébalo (node --check y, si puedes, con un simulador de DriveApp) y haz push; revisa que "Actualizar Apps Script" termine en verde. Nunca escribas claves reales en el archivo. Mantén compatibles las acciones que ya usan las apps instaladas.

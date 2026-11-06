@@ -1,0 +1,2 @@
+- ✦ (Jaider) Cada código Pro sirve en un solo teléfono: ves en cuál está, si otro intentó usarlo, y lo puedes liberar cuando la persona cambie de teléfono
+- (Ella) Sin cambios visibles: se actualiza para ir a la par con la de Jaider

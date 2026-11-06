@@ -41,13 +41,21 @@
   function pubProSave(st){try{localStorage.setItem(PUB_PRO_KEY,JSON.stringify(st))}catch{}try{window.NativeStore?.savePhoto?.('kv_'+PUB_PRO_KEY,JSON.stringify(st))}catch{}}
   // Si borran el almacenamiento web, el código se recupera del almacenamiento nativo
   try{if(!localStorage.getItem(PUB_PRO_KEY)){const n=window.NativeStore?.loadPhoto?.('kv_'+PUB_PRO_KEY);if(n)localStorage.setItem(PUB_PRO_KEY,n)}}catch{}
+  // Identificador de este teléfono (aleatorio, sin datos personales): el código Pro queda amarrado a él.
+  function pubDevice(){
+    let d='';try{d=localStorage.getItem('mp_device_id')||''}catch{}
+    if(!d){try{d=window.NativeStore?.loadPhoto?.('kv_mp_device_id')||''}catch{}}
+    if(!/^[a-zA-Z0-9_-]{8,64}$/.test(d)){d='d'+Date.now().toString(36)+Array.from({length:3},()=>Math.random().toString(36).slice(2,10)).join('')}
+    try{localStorage.setItem('mp_device_id',d)}catch{}try{window.NativeStore?.savePhoto?.('kv_mp_device_id',d)}catch{}
+    return d;
+  }
   function pubProOn(){const st=pubProSt();return !!(st.code&&Number(st.expiresAt)>Date.now())}
   const pubFecha=ts=>new Date(Number(ts)||0).toLocaleDateString('es-CO',{day:'numeric',month:'long',year:'numeric'});
   async function pubProCall(action,extra={},code=pubProSt().code){
-    const r=await nxHttp('POST',PUB_PRO_URL,{'Content-Type':'text/plain;charset=utf-8'},JSON.stringify({action,pro:code,...extra}));
+    const r=await nxHttp('POST',PUB_PRO_URL,{'Content-Type':'text/plain;charset=utf-8'},JSON.stringify({action,pro:code,device:pubDevice(),...extra}));
     if(r.status<0)throw new Error('Sin conexión. Revisa tu internet.');
     let j;try{j=JSON.parse(r.text)}catch{throw new Error('No se pudo conectar con el servidor.')}
-    if(!j.ok){const e=new Error(j.error||'Error del servidor');e.auth=/c[oó]digo pro|venci|desactivado|inv[aá]lido/i.test(j.error||'');throw e}
+    if(!j.ok){const e=new Error(j.error||'Error del servidor');e.auth=/c[oó]digo pro|venci|desactivado|inv[aá]lido|otro tel/i.test(j.error||'');throw e}
     return j;
   }
   function pubProKeys(keys){
@@ -71,7 +79,7 @@
     if(Number(st.expiresAt)<=Date.now()){pubProOff('Tu acceso Pro venció. Sigues con la versión gratis y tus datos están intactos.');return}
     if(Date.now()-(Number(st.verifiedAt)||0)<6*3600000)return;
     try{await pubProActivate(st.code,{quiet:true});const left=(Number(pubProSt().expiresAt)-Date.now())/86400000;if(left<3)toast(`✦ Tu Pro vence en ${Math.max(1,Math.ceil(left))} día(s).`)}
-    catch(e){if(e.auth)pubProOff(e.message+'. Sigues con la versión gratis y tus datos están intactos.')}
+    catch(e){if(e.auth)pubProOff((/otro tel/i.test(e.message)?'Tu código Pro ahora está en otro teléfono':e.message)+'. Sigues con la versión gratis y tus datos están intactos.')}
   }
   // Copia en la nube: sube lo que cambió (como mucho cada 3 min) y al salir de la app.
   let pubSyncBusy=false;
@@ -126,7 +134,7 @@
     const code=($(inputSel)?.value||'').trim(),err=$(errSel);if(!code){$(inputSel)?.focus();return false}
     if(btn){btn.disabled=true;btn.dataset.t=btn.textContent;btn.textContent='Verificando…'}if(err)err.textContent='';
     try{await pubProActivate(code);return true}
-    catch(e){if(err)err.textContent=e.auth?(e.message||'Código inválido'):(e.message||'No se pudo verificar.');return false}
+    catch(e){if(err)err.textContent=/otro tel/i.test(e.message||'')?'Este código ya se está usando en otro teléfono. Si cambiaste de teléfono, pídele a quien te lo dio que lo libere.':e.auth?(e.message||'Código inválido'):(e.message||'No se pudo verificar.');return false}
     finally{if(btn){btn.disabled=false;btn.textContent=btn.dataset.t||'Activar'}}
   }
   document.addEventListener('click',async e=>{

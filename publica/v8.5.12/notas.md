@@ -1,0 +1,1 @@
+- 🔑 Tu código Pro queda en este teléfono. Si cambias de teléfono, pide que lo liberen y recupera tu copia de la nube
