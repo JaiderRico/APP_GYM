@@ -1,0 +1,2 @@
+- ☁️ Al empezar, la app te pregunta si quieres guardar una copia de tu progreso en la nube (lo puedes cambiar en Ajustes)
+- ✨ Textos del respaldo más simples
