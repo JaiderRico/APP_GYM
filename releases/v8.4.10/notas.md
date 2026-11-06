@@ -1,0 +1,1 @@
+- 🧪 Versión de prueba: es igual a la 8.4.1. Sirve para comprobar que la actualización desde la app funciona.
