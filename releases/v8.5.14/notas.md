@@ -1,0 +1,2 @@
+- 🔑 Si las claves de IA del teléfono fallan, la app trae las nuevas del servidor sola y vuelve a intentar
+- Las claves se actualizan cada 3 horas (antes cada 12)

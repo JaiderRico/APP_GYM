@@ -78,11 +78,11 @@
     const prov=v85UrlProv(url);
     if(!prov||!init||!init.headers||init.headers instanceof Headers)return v85Fetch(input,init);
     const h=init.headers,cur=prov==='anthropic'?String(h['x-api-key']||''):String(h.authorization||h.Authorization||'').replace(/^Bearer\s+/i,'');
-    const pool=v85Pool(prov,cur);
-    if(pool.length<2)return v85Fetch(input,init);
-    let res=null;
+    let pool=v85Pool(prov,cur);
+    if(!pool.length)return v85Fetch(input,init);
+    let res=null;const tried=new Set();
     for(let i=0;i<pool.length;i++){
-      const k=pool[i],hh={...h};
+      const k=pool[i],hh={...h};tried.add(k);
       if(prov==='anthropic')hh['x-api-key']=k;else{delete hh.Authorization;hh.authorization='Bearer '+k}
       res=await v85Fetch(input,{...init,headers:hh});
       if(res.status!==429&&res.status!==401&&res.status!==403){
@@ -92,12 +92,17 @@
       }
       const ra=Number(res.headers?.get?.('retry-after'))||0;
       v85MarkCool(k,res.status===429?Math.max(ra*1000,5*60000):6*3600000);
+      // Se acabaron las claves que tenía el teléfono: traer las del servidor (quizá agregaste nuevas) y seguir con esas
+      if(i===pool.length-1&&prov==='groq'&&!init.__v85Synced&&Date.now()-(v85Ls.get('mp_ai_keys_force',0))>60000){
+        init.__v85Synced=true;v85Ls.set('mp_ai_keys_force',Date.now());
+        if(await v85SyncKeys(true)){const more=v85Pool(prov,'').filter(x=>!tried.has(x));pool=pool.concat(more)}
+      }
     }
     return res;
   };
   async function v85SyncKeys(force){
     if(!v85Code())return false;
-    const last=v85Ls.get('mp_ai_keys_sync',0);if(!force&&Date.now()-last<12*3600000)return false;
+    const last=v85Ls.get('mp_ai_keys_sync',0);if(!force&&Date.now()-last<3*3600000)return false;
     try{
       const j=await v85Gas('verify_code');v85Ls.set('mp_ai_keys_sync',Date.now());
       if(Array.isArray(j.groqKeys)){
