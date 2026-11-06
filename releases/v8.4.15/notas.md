@@ -1,0 +1,1 @@
+- 🧹 Si se limpian los respaldos de Ella, la app de Jaider deja de mostrar sus datos viejos guardados en el teléfono
