@@ -1,0 +1,47 @@
+# Publica automáticamente la versión más alta que haya en releases/vX.Y.Z/
+# - Si el Release no existe, lo crea con las APK y lo marca como "Latest".
+# - Si ya existe, reemplaza sus APK (útil para corregir una versión) y lo deja como "Latest".
+name: Publicar versión
+
+on:
+  push:
+    branches: [main]
+    paths: ['releases/**']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: publicar-version
+  cancel-in-progress: false
+
+jobs:
+  publicar:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Crear o actualizar el Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+          DIRS=(releases/v*/)
+          [ ${#DIRS[@]} -gt 0 ] || { echo "No hay carpetas releases/vX.Y.Z"; exit 1; }
+          DIR=$(printf '%s\n' "${DIRS[@]%/}" | sort -V | tail -1)
+          TAG=$(basename "$DIR")
+          APKS=("$DIR"/*.apk)
+          [ ${#APKS[@]} -gt 0 ] || { echo "No hay APK en $DIR"; exit 1; }
+          echo "Versión: $TAG"; printf '  %s\n' "${APKS[@]}"
+          NOTES=()
+          [ -f "$DIR/notas.md" ] && NOTES=(--notes-file "$DIR/notas.md")
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release upload "$TAG" "${APKS[@]}" --clobber
+            gh release edit "$TAG" --latest "${NOTES[@]}"
+          else
+            [ ${#NOTES[@]} -gt 0 ] || NOTES=(--notes "Mi Progreso ${TAG#v}")
+            gh release create "$TAG" "${APKS[@]}" --title "Mi Progreso ${TAG#v}" --latest "${NOTES[@]}"
+          fi
+          gh release view "$TAG" --json tagName,assets --jq '{tag:.tagName, apks:[.assets[].name]}'

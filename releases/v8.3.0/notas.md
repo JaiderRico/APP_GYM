@@ -1,0 +1,6 @@
+- 💬 Ella puede reaccionar y responder a tus mensajes
+- 📋 Jaider puede mandarle rutinas listas para empezar
+- 💡 Peso sugerido en el modo libre (según la última vez y su ciclo)
+- 📅 Resumen semanal con series por músculo y análisis con IA
+- 📸 Antes y ahora: fotos lado a lado con sus medidas
+- 🔧 La tarjeta de actualización ya se ve en la app de ella
