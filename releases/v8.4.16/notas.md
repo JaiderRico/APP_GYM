@@ -1,0 +1,3 @@
+- 🔔 Notificaciones aunque la app esté cerrada (revisa novedades cada ~15 min):
+  - App de Ella: mensajes y rutinas nuevas de Jaider
+  - App de Jaider: respuestas de Ella y cuando termina un entreno
