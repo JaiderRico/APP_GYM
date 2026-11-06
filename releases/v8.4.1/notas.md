@@ -1,0 +1,2 @@
+- 🔧 Arreglo: "Instalar" ya no reinstala una versión vieja descargada antes; ahora baja e instala la versión nueva
+- Incluye todo lo de la 8.4.0 (temas de color, alarma del descanso, envíos sin internet, copia de fotos)
