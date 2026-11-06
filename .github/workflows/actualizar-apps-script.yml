@@ -68,10 +68,17 @@ jobs:
         if: env.SALTAR != '1'
         run: |
           set -euo pipefail
-          sleep 5
-          R=$(curl -sSL "https://script.google.com/macros/s/$DEPLOYMENT_ID/exec?action=health")
-          echo "$R"
+          ESPERADA=$(grep -oP "const BACKEND_VERSION = '\K[^']+" herramientas/fuente/MiProgreso_Backend.gs || true)
+          for i in 1 2 3 4 5 6 7 8 9 10 11 12; do
+            sleep 10
+            R=$(curl -sSL "https://script.google.com/macros/s/$DEPLOYMENT_ID/exec?action=health" || true)
+            echo "$R"
+            V=$(echo "$R" | jq -r '.version // empty' 2>/dev/null || true)
+            [ -z "$ESPERADA" ] || [ "$V" = "$ESPERADA" ] && break
+            echo "Todavía responde $V (espero $ESPERADA)…"
+          done
           echo "$R" | jq -e '.ok == true' >/dev/null || { echo "::error::El Apps Script no respondió bien"; exit 1; }
+          [ -z "$ESPERADA" ] || [ "$V" = "$ESPERADA" ] || { echo "::error::El Apps Script sigue respondiendo $V y no $ESPERADA"; exit 1; }
           echo "$R" | jq -e '.clavesConfiguradas == true' >/dev/null || { echo "::error::Faltan CODIGO_ELLA / CODIGO_ADMIN en Propiedades del script. Las apps no podrán entrar hasta agregarlas."; exit 1; }
 
       - name: Limpiar credenciales
