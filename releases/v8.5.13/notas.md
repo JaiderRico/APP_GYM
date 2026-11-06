@@ -1,0 +1,3 @@
+- 📷 Fotos y videos en el chat (botón 📎)
+- 👁 Fotos y videos para ver una vez: se borran apenas la otra persona los cierra
+- Videos de hasta 20 MB; las fotos se comprimen solas

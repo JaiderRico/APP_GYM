@@ -40,6 +40,24 @@
     #v85Mini .t{font-size:15px;font-weight:700;max-width:100%;overflow:hidden;text-overflow:ellipsis}
     #v85Mini .s{font-size:12px;color:var(--muted);max-width:100%}
     .v85-req{border-left:4px solid var(--green)}
+    .v85-ch-foot .v85-att{min-width:44px;padding:0;background:var(--panel2);color:var(--text)}
+    .v85-sheet{display:grid;grid-template-columns:1fr 1fr;gap:8px;padding:10px 12px 0;background:var(--panel);border-top:1px solid var(--line)}
+    .v85-sheet.hidden{display:none}.v85-sheet button{margin:0;padding:10px 6px;font-size:13px}
+    .v85-msg.media{padding:4px;max-width:72%}.v85-msg.media .cap{padding:4px 8px 0}
+    .v85-mbox{position:relative;display:block;border-radius:12px;overflow:hidden;background:#0003;min-width:160px;min-height:110px;cursor:pointer}
+    .v85-mbox img{display:block;width:100%;max-height:320px;object-fit:cover}
+    .v85-mbox img.blur{filter:blur(8px);transform:scale(1.08)}
+    .v85-mbox .ov{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:4px;color:#fff;text-shadow:0 1px 3px #000;font-weight:800}
+    .v85-mbox .ov .pl{font-size:34px;line-height:1}.v85-mbox .ov small{font-weight:600;font-size:11px}
+    .v85-once{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:12px;background:#0002;min-width:180px;cursor:pointer}
+    .v85-once b{display:block;font-size:14px}.v85-once span{font-size:12px;opacity:.8}.v85-once .i{font-size:26px}
+    .v85-once.off{cursor:default;opacity:.7}
+    #v85View{position:fixed;inset:0;z-index:9600;background:#000;display:flex;flex-direction:column;align-items:center;justify-content:center}
+    #v85View img,#v85View video{max-width:100%;max-height:calc(100% - 90px);-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
+    #v85View .vh{position:absolute;top:0;left:0;right:0;display:flex;justify-content:space-between;align-items:center;padding:calc(env(safe-area-inset-top,0px) + 10px) 12px 10px;color:#fff;background:linear-gradient(#000a,#0000)}
+    #v85View .vh button{margin:0;background:#fff2;color:#fff;border:0}
+    #v85View .cap{color:#fff;padding:10px 16px;text-align:center;white-space:pre-wrap}
+    .v85-spin{width:26px;height:26px;border:3px solid #fff5;border-top-color:#fff;border-radius:50%;animation:v85sp 0.9s linear infinite}@keyframes v85sp{to{transform:rotate(1turn)}}
   </style>`);
 
   /* ---------- 1) Varias claves de IA: si una se agota, se usa la siguiente ---------- */
@@ -107,12 +125,17 @@
   const v85CacheKey=()=>'mp_chat_v1_'+(v85ThreadKey()||'main');
   const v85OutKey='mp_chat_out_v1';
   function v85LoadCache(){const c=v85Ls.get(v85CacheKey(),{msgs:[],readByOther:0});v85Chat.msgs=Array.isArray(c.msgs)?c.msgs:[];v85Chat.readByOther=Number(c.readByOther)||0}
-  function v85SaveCache(){v85Ls.set(v85CacheKey(),{msgs:v85Chat.msgs.slice(-300),readByOther:v85Chat.readByOther})}
+  function v85SaveCache(){
+    const L=v85Chat.msgs.slice(-300),keep=L.length-60;
+    v85Ls.set(v85CacheKey(),{msgs:L.map((m,i)=>i<keep&&m.media&&m.media.thumb?{...m,media:{...m.media,thumb:''}}:m),readByOther:v85Chat.readByOther});
+  }
   function v85Out(){const o=v85Ls.get(v85OutKey,[]);return Array.isArray(o)?o:[]}
   const v85Me=()=>V85_ELLA?'ella':'jaider';
   function v85Merge(list){
     const byId=new Map(v85Chat.msgs.map(m=>[m.id,m]));let added=0;
-    (list||[]).forEach(m=>{if(!m||!m.id)return;if(!byId.has(m.id)||byId.get(m.id).pending)added+=byId.has(m.id)?0:1;byId.set(m.id,{id:m.id,from:m.from,text:m.text,ts:Number(m.ts)||0})});
+    (list||[]).forEach(m=>{if(!m||!m.id)return;if(!byId.has(m.id))added++;const old=byId.get(m.id);
+      const media=m.media?{...(old&&old.media||{}),...m.media,...(old&&old.media&&old.media.opened&&!m.media.opened?{opened:old.media.opened}:{})}:undefined;
+      byId.set(m.id,{id:m.id,from:m.from,text:m.text||'',ts:Number(m.ts)||0,...(media?{media}:{})})});
     v85Chat.msgs=[...byId.values()].sort((a,b)=>(a.ts||0)-(b.ts||0));return added;
   }
   function v85EnsureBtn(){
@@ -127,21 +150,125 @@
   function v85Render(){
     const box=$('#v85ChList');if(!box)return;
     const me=v85Me(),pend=v85Out().filter(o=>(o.thread||'')===v85ThreadKey());
-    const all=[...v85Chat.msgs,...pend.filter(p=>!v85Chat.msgs.some(m=>m.id===p.id)).map(p=>({...p,from:me,pending:true}))];
+    const sending=(v85Chat.sending||[]).filter(x=>(x.thread||'')===v85ThreadKey()&&!v85Chat.msgs.some(m=>m.id===x.id)).map(x=>({id:x.id,from:me,text:x.text,ts:x.ts,media:x.media,pending:true,sendErr:x.err}));
+    const all=[...v85Chat.msgs,...pend.filter(p=>!v85Chat.msgs.some(m=>m.id===p.id)).map(p=>({...p,from:me,pending:true})),...sending];
     if(!all.length){box.innerHTML=`<div class="v85-ch-empty"><div style="font-size:40px">💬</div><p>Aún no hay mensajes. Escríbele a ${esc(v85Other())} lo que quieras: dudas de la rutina, cambios para la app o cómo te fue.</p></div>`;return}
     let h='',lastDay='';const lastMine=[...all].reverse().find(m=>m.from===me&&!m.pending);
     all.forEach(m=>{const day=v85DayLabel(m.ts||Date.now());if(day!==lastDay){h+=`<div class="v85-day">${esc(day)}</div>`;lastDay=day}
-      h+=`<div class="v85-msg${m.from===me?' me':''}${m.pending?' pend':''}">${esc(m.text)}<small>${m.pending?'⏳ enviando':esc(v85Time(m.ts))}</small></div>`;
+      const st=m.sendErr?`⚠️ No se envió · <a href="#" data-v85-retry="${esc(m.id)}" style="color:inherit;font-weight:800">Reintentar</a>`:m.pending?(m.media?'⏳ enviando… (puede tardar con videos)':'⏳ enviando'):esc(v85Time(m.ts));
+      h+=m.media?`<div class="v85-msg media${m.from===me?' me':''}${m.pending&&!m.sendErr?' pend':''}">${v85MediaHtml(m,me)}${m.text?`<div class="cap">${esc(m.text)}</div>`:''}<small>${st}</small></div>`
+        :`<div class="v85-msg${m.from===me?' me':''}${m.pending?' pend':''}">${esc(m.text)}<small>${st}</small></div>`;
       if(lastMine&&m.id===lastMine.id&&v85Chat.readByOther>=lastMine.ts)h+='<div class="v85-seen">✓✓ Visto</div>'});
     const atBottom=box.scrollHeight-box.scrollTop-box.clientHeight<80;
     box.innerHTML=h;if(atBottom||v85Chat.forceScroll){box.scrollTop=box.scrollHeight;v85Chat.forceScroll=false}
+    v85AutoLoadImages();
+  }
+
+  /* ---------- 2b) Fotos y videos en el chat (normales o "ver una vez") ---------- */
+  const V85_MAX_VIDEO=20*1024*1024,v85Full={},v85Loading={};
+  const v85Kb=n=>n>1048576?(n/1048576).toFixed(1)+' MB':Math.max(1,Math.round(n/1024))+' KB';
+  const v85Dur=s=>s?`${Math.floor(s/60)}:${String(Math.round(s%60)).padStart(2,'0')}`:'';
+  function v85CachedImg(id){if(v85Full[id])return v85Full[id];try{const v=window.NativeStore?.loadPhoto?.('chatm_'+id);if(v&&/^data:image/.test(v)){v85Full[id]=v;return v}}catch{}return ''}
+  function v85CacheImg(id,url){v85Full[id]=url;try{window.NativeStore?.savePhoto?.('chatm_'+id,url)}catch{}}
+  function v85MediaHtml(m,me){
+    const x=m.media,mine=m.from===me,vid=x.kind==='video',name=vid?'Video':'Foto';
+    if(x.once){
+      if(m.pending)return `<div class="v85-once off"><span class="i">👁</span><div><b>${name} · ver una vez</b><span>Enviando…</span></div></div>`;
+      if(mine)return `<div class="v85-once off"><span class="i">${x.opened?'✓':'👁'}</span><div><b>${name} · ver una vez</b><span>${x.opened?'Abierta':'Sin abrir'}</span></div></div>`;
+      return x.opened?`<div class="v85-once off"><span class="i">✓</span><div><b>${name} · ver una vez</b><span>Ya la abriste</span></div></div>`
+        :`<div class="v85-once" data-v85-open="${esc(m.id)}"><span class="i">👁</span><div><b>${name} · ver una vez</b><span>Toca para abrir (se borra al cerrar)</span></div></div>`;
+    }
+    const full=!vid&&v85CachedImg(m.id),src=full||x.thumb||'';
+    const ov=vid?`<div class="ov"><span class="pl">▶</span><small>${esc([v85Dur(x.dur),x.size?v85Kb(x.size):''].filter(Boolean).join(' · '))}</small></div>`:(!full&&!m.pending?'<div class="ov"><div class="v85-spin"></div></div>':'');
+    return `<div class="v85-mbox" ${m.pending?'':`data-v85-open="${esc(m.id)}"`}>${src?`<img src="${src}" class="${full||vid?'':'blur'}" alt="">`:`<div style="height:140px"></div>`}${ov}</div>`;
+  }
+  // URL y cuerpo de cada app (código y, en la de Ella, app:'ella')
+  function v85Url(){try{return V85_ELLA?herUrl():hmUrl()}catch{return MP_DRIVE_URL}}
+  async function v85Big(action,extra){
+    const body=JSON.stringify({action,code:v85Code(),...(V85_ELLA?{app:'ella'}:{}),...extra});
+    let txt=null;
+    try{const ctl=new AbortController(),to=setTimeout(()=>ctl.abort(),300000);
+      const r=await fetch(v85Url(),{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body,signal:ctl.signal});clearTimeout(to);txt=await r.text()}
+    catch(e){const r=await nxHttp('POST',v85Url(),{'Content-Type':'text/plain;charset=utf-8'},body);if(r.status<0)throw new Error('Sin conexión. Revisa tu internet.');txt=r.text}
+    let j;try{j=JSON.parse(txt)}catch{throw new Error('No se pudo conectar con el servidor.')}
+    if(!j.ok){const e=new Error(j.error||'Error del servidor');e.auth=/c[oó]digo/i.test(j.error||'')&&!/ver una vez/i.test(j.error||'');throw e}
+    return j;
+  }
+  async function v85GetMedia(id){
+    if(v85Loading[id])return v85Loading[id];
+    return v85Loading[id]=(async()=>{try{const tk=v85ThreadKey();return (await v85Big('chat_media',{id,...(tk?{thread:tk}:{})})).media}finally{delete v85Loading[id]}})();
+  }
+  function v85AutoLoadImages(){
+    if(!v85Chat.open)return;
+    v85Chat.msgs.slice(-30).forEach(m=>{if(m.media&&m.media.kind==='image'&&!m.media.once&&!v85CachedImg(m.id)&&!v85Loading[m.id]&&!(v85Chat.failed||{})[m.id]){
+      v85GetMedia(m.id).then(x=>{v85CacheImg(m.id,x.dataUrl);v85Render()}).catch(()=>{(v85Chat.failed=v85Chat.failed||{})[m.id]=1})}});
+  }
+  async function v85Open(id){
+    const m=v85Chat.msgs.find(x=>x.id===id);if(!m||!m.media)return;const x=m.media;
+    if(x.once&&m.from!==v85Me()&&!confirm(`Es ${x.kind==='video'?'un video':'una foto'} para ver una vez: al cerrarl${x.kind==='video'?'o':'a'} se borra. ¿Abrir ahora?`))return;
+    v85Viewer(null,m);
+    try{
+      let url=x.kind==='image'&&!x.once?v85CachedImg(id):'';
+      if(!url){const r=await v85GetMedia(id);url=r.dataUrl;if(x.kind==='image'&&!x.once)v85CacheImg(id,url)}
+      if(x.once){x.opened=Date.now();v85SaveCache();v85Render()}
+      if(!$('#v85View'))return;
+      if(x.kind==='video'){const b=await (await fetch(url)).blob();v85Viewer(URL.createObjectURL(b),m)}else v85Viewer(url,m);
+    }catch(e){$('#v85View')?.remove();toast(e.message||'No se pudo abrir.');if(/Ya lo abriste/.test(e.message||'')){x.opened=x.opened||Date.now();v85SaveCache();v85Render()}}
+  }
+  function v85Viewer(url,m){
+    const old=$('#v85View');const oldUrl=old?.dataset.blob;if(oldUrl)try{URL.revokeObjectURL(oldUrl)}catch{}old?.remove();
+    const x=m.media,vid=x.kind==='video';
+    const body=!url?'<div class="v85-spin"></div>':vid?`<video src="${url}" controls autoplay playsinline controlslist="nodownload" ${x.once?'disablepictureinpicture':''}></video>`:`<img src="${url}" alt="">`;
+    document.body.insertAdjacentHTML('beforeend',`<div id="v85View" ${url&&vid?`data-blob="${url}"`:''} oncontextmenu="return false"><div class="vh"><span>${x.once?'👁 Ver una vez · se borra al cerrar':esc(v85DayLabel(m.ts)+' '+v85Time(m.ts))}</span><button data-v85-view-close>✕ Cerrar</button></div>${body}${m.text?`<div class="cap">${esc(m.text)}</div>`:''}</div>`);
+  }
+  function v85CloseView(){const v=$('#v85View');if(!v)return;const u=v.dataset.blob;v.querySelector('video')?.pause();if(u)try{URL.revokeObjectURL(u)}catch{}v.remove()}
+  // Preparar el archivo: fotos comprimidas (máx. 1600 px), videos tal cual (máx. 20 MB)
+  function v85ReadUrl(file){return new Promise((ok,no)=>{const r=new FileReader();r.onload=()=>ok(String(r.result));r.onerror=()=>no(new Error('No pude leer el archivo.'));r.readAsDataURL(file)})}
+  function v85Jpeg(src,max,q){const sc=Math.min(1,max/Math.max(src.w,src.h)),c=document.createElement('canvas');c.width=Math.max(1,Math.round(src.w*sc));c.height=Math.max(1,Math.round(src.h*sc));c.getContext('2d').drawImage(src.el,0,0,c.width,c.height);return c.toDataURL('image/jpeg',q)}
+  function v85Thumb(src){for(const [mx,q] of [[120,.6],[90,.5],[64,.45]]){const t=v85Jpeg(src,mx,q);if(t.length<=11500)return t}return ''}
+  async function v85PrepImage(file){
+    const u=URL.createObjectURL(file);
+    try{const img=await new Promise((ok,no)=>{const i=new Image();i.onload=()=>ok(i);i.onerror=()=>no(new Error('No pude leer la foto.'));i.src=u});
+      const src={el:img,w:img.naturalWidth,h:img.naturalHeight};
+      return {dataUrl:v85Jpeg(src,1600,.82),thumb:v85Thumb(src),w:src.w,h:src.h,kind:'image'};
+    }finally{URL.revokeObjectURL(u)}
+  }
+  async function v85PrepVideo(file){
+    if(file.size>V85_MAX_VIDEO)throw new Error(`El video pesa ${v85Kb(file.size)}. El máximo es 20 MB: recórtalo o grábalo más corto.`);
+    const type=/^video\/(mp4|3gpp|webm|quicktime|x-matroska)$/.test(file.type)?file.type:'video/mp4';
+    let dataUrl=await v85ReadUrl(file);dataUrl=dataUrl.replace(/^data:[^;,]*;/,'data:'+type+';');
+    let thumb='',w=0,h=0,dur=0;const u=URL.createObjectURL(file);
+    try{await new Promise(ok=>{const v=document.createElement('video');v.muted=true;v.playsInline=true;v.preload='auto';const done=()=>ok();const t=setTimeout(done,5000);
+      v.onloadedmetadata=()=>{dur=Math.round(v.duration)||0;w=v.videoWidth;h=v.videoHeight;try{v.currentTime=Math.min(0.5,(v.duration||1)/2)}catch{clearTimeout(t);done()}};
+      v.onseeked=()=>{try{thumb=v85Thumb({el:v,w:v.videoWidth,h:v.videoHeight})}catch{}clearTimeout(t);done()};v.onerror=()=>{clearTimeout(t);done()};v.src=u})}
+    finally{URL.revokeObjectURL(u)}
+    return {dataUrl,thumb,w,h,dur,kind:'video'};
+  }
+  async function v85SendMedia(file,once){
+    const vid=/^video\//.test(file.type)||/\.(mp4|3gp|webm|mov|mkv)$/i.test(file.name||'');
+    const inp=$('#v85ChInput'),text=(inp?.value||'').trim().slice(0,1000);
+    let prep;try{toast(vid?'Preparando el video…':'Preparando la foto…');prep=vid?await v85PrepVideo(file):await v85PrepImage(file)}catch(e){toast(e.message||'No se pudo preparar.');return}
+    if(inp){inp.value='';inp.style.height=''}
+    const item={id:'m'+Date.now().toString(36)+Math.random().toString(36).slice(2,7),ts:Date.now(),text,thread:v85ThreadKey(),
+      media:{kind:prep.kind,once:!!once,thumb:once?'':prep.thumb,w:prep.w,h:prep.h,dur:prep.dur||0,size:Math.round(prep.dataUrl.length*0.75)},data:prep};
+    v85Chat.sending=[...(v85Chat.sending||[]),item];v85Chat.forceScroll=true;v85Render();v85SendItem(item);
+  }
+  async function v85SendItem(item){
+    item.err='';v85Render();
+    try{
+      const p=item.data;
+      const j=await v85Big('chat_send',{id:item.id,text:item.text,...(item.thread?{thread:item.thread}:{}),media:{dataUrl:p.dataUrl,kind:p.kind,once:item.media.once,thumb:item.media.thumb,w:p.w,h:p.h,dur:p.dur}});
+      if(p.kind==='image'&&!item.media.once)v85CacheImg(item.id,p.dataUrl);
+      if((item.thread||'')===v85ThreadKey())v85Merge([j.message]);
+      v85Chat.sending=(v85Chat.sending||[]).filter(x=>x!==item);v85SaveCache();v85Render();
+    }catch(e){item.err=e.message||'error';v85Render();toast(e.message||'No se pudo enviar.')}
   }
   function v85OpenChat(thread){
     if(!v85Code()){toast(V85_ELLA?'Activa tu app primero.':'Primero escribe tu código de administrador.');return}
     v85Chat.thread=V85_ELLA?'':(thread==='prueba'?'prueba':'');v85LoadCache();
     $('#v85Chat')?.remove();
     const th=V85_ELLA?'':`<div class="v85-th"><button class="secondary ${v85Chat.thread?'':'on'}" data-v85-th="">Con ${esc(v85Other())}</button><button class="secondary ${v85Chat.thread?'on':''}" data-v85-th="prueba">🧪 Prueba</button></div>`;
-    document.body.insertAdjacentHTML('beforeend',`<div class="v85-chat" id="v85Chat" role="dialog" aria-modal="true"><div class="v85-ch-head"><h2>💬 ${esc(v85Other())}<span class="small" id="v85ChSub">${V85_ELLA&&(()=>{try{return kvGet('app_user')==='prueba'}catch{return false}})()?'🧪 Modo prueba: chat aparte':'Los mensajes llegan aunque la app esté cerrada'}</span></h2><button class="secondary" data-v85-close>Cerrar</button></div>${th}<div class="v85-ch-list" id="v85ChList"></div><div class="v85-ch-foot"><textarea id="v85ChInput" rows="1" maxlength="1000" placeholder="Escribe un mensaje…"></textarea><button class="primary" data-v85-send aria-label="Enviar">➤</button></div></div>`);
+    document.body.insertAdjacentHTML('beforeend',`<div class="v85-chat" id="v85Chat" role="dialog" aria-modal="true"><div class="v85-ch-head"><h2>💬 ${esc(v85Other())}<span class="small" id="v85ChSub">${V85_ELLA&&(()=>{try{return kvGet('app_user')==='prueba'}catch{return false}})()?'🧪 Modo prueba: chat aparte':'Los mensajes llegan aunque la app esté cerrada'}</span></h2><button class="secondary" data-v85-close>Cerrar</button></div>${th}<div class="v85-ch-list" id="v85ChList"></div><div class="v85-sheet hidden" id="v85Sheet"><button class="secondary" data-v85-pick="image">📷 Foto</button><button class="secondary" data-v85-pick="video">🎥 Video</button><button class="secondary" data-v85-pick="image" data-once="1">👁 Foto · ver una vez</button><button class="secondary" data-v85-pick="video" data-once="1">👁 Video · ver una vez</button></div><input type="file" id="v85File" hidden><div class="v85-ch-foot"><button class="secondary v85-att" data-v85-attach aria-label="Adjuntar foto o video">📎</button><textarea id="v85ChInput" rows="1" maxlength="1000" placeholder="Escribe un mensaje…"></textarea><button class="primary" data-v85-send aria-label="Enviar">➤</button></div></div>`);
     v85Chat.open=true;v85Chat.forceScroll=true;v85Render();v85Refresh(true);
     clearInterval(v85Chat.timer);v85Chat.timer=setInterval(()=>{if(!document.hidden)v85Refresh(false)},5000);
   }
@@ -160,7 +287,7 @@
       const tk=v85ThreadKey(),j=await v85Gas('chat_list',{since,...(tk?{thread:tk}:{})});
       const added=v85Merge(j.messages);v85Chat.readByOther=Number(j.readByOther)||0;
       if(v85Chat.open){if((j.unread>0||markRead)&&j.unread>0){try{await v85Gas('chat_read',tk?{thread:tk}:{})}catch{}}v85Chat.unread=tk?v85Chat.unread:0}
-      else{const prev=v85Chat.unread;v85Chat.unread=Number(j.unread)||0;if(v85Chat.unread>prev){const last=[...v85Chat.msgs].reverse().find(m=>m.from!==v85Me());if(last)toast(`💬 ${v85Other()}: ${last.text.slice(0,70)}`)}}
+      else{const prev=v85Chat.unread;v85Chat.unread=Number(j.unread)||0;if(v85Chat.unread>prev){const last=[...v85Chat.msgs].reverse().find(m=>m.from!==v85Me());if(last)toast(`💬 ${v85Other()}: ${last.media?(last.media.kind==='video'?'🎥 Video':'📷 Foto')+(last.media.once?' (ver una vez)':''):last.text.slice(0,70)}`)}}
       v85SaveCache();if(v85Chat.open)v85Render();v85Badge();
       if(added&&v85Chat.open&&!document.hidden)try{navigator.vibrate?.(30)}catch{}
     }catch(e){if(v85Chat.open&&e.auth)toast(e.message)}
@@ -273,7 +400,12 @@
   document.addEventListener('click',e=>{
     const t=e.target;
     if(t.closest('#v85ChatBtn')||t.closest('[data-v85-chat]')){try{closeM('settingsModal')}catch{}v85OpenChat('');return}
-    if(t.closest('[data-v85-close]')){v85CloseChat();return}
+    if(t.closest('[data-v85-close]')){v85CloseView();v85CloseChat();return}
+    if(t.closest('[data-v85-attach]')){$('#v85Sheet')?.classList.toggle('hidden');return}
+    const pk=t.closest('[data-v85-pick]');if(pk){const f=$('#v85File');if(!f)return;f.value='';f.accept=pk.dataset.v85Pick==='video'?'video/*':'image/*';f.dataset.once=pk.dataset.once?'1':'';$('#v85Sheet')?.classList.add('hidden');f.click();return}
+    const op=t.closest('[data-v85-open]');if(op){v85Open(op.dataset.v85Open);return}
+    if(t.closest('[data-v85-view-close]')){v85CloseView();return}
+    const rt=t.closest('[data-v85-retry]');if(rt){e.preventDefault();const it=(v85Chat.sending||[]).find(x=>x.id===rt.dataset.v85Retry);if(it)v85SendItem(it);return}
     if(t.closest('[data-v85-send]')){v85Send();return}
     const th=t.closest('[data-v85-th]');if(th){v85OpenChat(th.dataset.v85Th);return}
     if(t.closest('[data-v85-share]')){v85Share();return}
@@ -291,6 +423,7 @@
     const po=t.closest('[data-v85-pro-on]');if(po){v85ProAct(async()=>{const j=await gas('pro_update',{id:po.dataset.v85ProOn,revoke:false});v85ProSet(j.pro)},'✓ Código reactivado');return}
     const px=t.closest('[data-v85-pro-del]');if(px){if(!confirm('¿Borrar este código? Su carpeta en Drive no se borra.'))return;v85ProAct(async()=>{await gas('pro_delete',{id:px.dataset.v85ProDel});v85Pro.list=(v85Pro.list||[]).filter(x=>x.id!==px.dataset.v85ProDel)},'Código borrado');return}
   });
+  document.addEventListener('change',e=>{if(e.target.id==='v85File'){const f=e.target.files&&e.target.files[0];if(f)v85SendMedia(f,e.target.dataset.once==='1');return}});
   document.addEventListener('change',e=>{if(e.target.matches('[data-v85-pip-auto]')){v85PipPrefs().auto=e.target.checked;persist(true);v85Pip.auto=null;v85PipWatch()}});
   document.addEventListener('keydown',e=>{if(e.target.id==='v85ChInput'&&e.key==='Enter'&&!e.shiftKey){e.preventDefault();v85Send()}});
   document.addEventListener('input',e=>{if(e.target.id==='v85ChInput'){e.target.style.height='auto';e.target.style.height=Math.min(120,e.target.scrollHeight)+'px'}});

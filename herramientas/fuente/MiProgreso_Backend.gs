@@ -1,5 +1,5 @@
 // ============================================================================
-// BACKEND MI PROGRESO v17 — Google Apps Script (respaldo en Drive + app de Ella)
+// BACKEND MI PROGRESO v18 — Google Apps Script (respaldo en Drive + app de Ella)
 // ============================================================================
 // NOVEDAD v12 — DATOS POR USUARIO:
 //   La app de Ella (8.4.13+) manda app:'ella' en cada llamada. Con eso el backend sabe
@@ -14,6 +14,10 @@
 // ============================================================================
 // Carpeta "Mi Progreso v8.0":
 // https://drive.google.com/drive/folders/1hUkPHwACKs533vFBA0_D4VymitggIXKD
+//
+// v18: fotos y videos en el chat (normales o "ver una vez"). Los archivos van a una carpeta PRIVADA en la raíz
+//      de tu Drive ("Mi Progreso - Chat (privado)"), no en la carpeta compartida. Los de "ver una vez" solo los
+//      puede abrir quien los recibe, una sola vez, y el archivo se manda a la papelera al abrirlo.
 //
 // v17: cada código Pro sirve en UN solo teléfono. El primero que lo activa queda amarrado (device);
 //      otro teléfono recibe "Este código ya está en uso en otro teléfono". Jaider lo libera con
@@ -70,6 +74,8 @@
 //   chat_send      { code, app?, thread?, id, text } -> manda un mensaje al chat        (Ella o admin)
 //   chat_list      { code, app?, thread?, since? }   -> mensajes del chat y no leídos   (Ella o admin)
 //   chat_read      { code, app?, thread?, upTo? }    -> marca el chat como leído        (Ella o admin)
+//   chat_send      { …, media:{ dataUrl, kind:'image'|'video', once, thumb?, w?, h?, dur? } } -> foto o video
+//   chat_media     { code, app?, thread?, id }       -> { dataUrl } del archivo (ver una vez: solo quien lo recibe, 1 vez)
 //     · App de Ella con su código -> chat "ella"; con el código admin (prueba) -> chat "prueba".
 //     · App de Jaider -> chat "ella" (o thread:'prueba' para ver el de prueba).
 //   pro_create     { code, name, days }           -> crea un código Pro temporal        (solo admin)
@@ -97,7 +103,7 @@ function prop_(k, respaldo) {
 const CODIGO_ELLA  = prop_('CODIGO_ELLA',  "TU_CODIGO_SECRETO_AQUI");
 const CODIGO_ADMIN = prop_('CODIGO_ADMIN', "TU_CODIGO_ADMIN");
 const GROQ_API_KEY = prop_('GROQ_API_KEY', "TU_API_KEY_DE_GROQ");
-const BACKEND_VERSION = 'v17';
+const BACKEND_VERSION = 'v18';
 // Todas las claves de Groq configuradas, sin repetir y en orden (la principal primero).
 function groqKeys_() {
   const out = [];
@@ -305,6 +311,38 @@ function saveRequests(folder, list) {
 const CHAT_FILE = 'chat_mi_progreso.json';
 const MAX_CHAT = 400;
 const MAX_TEXTO_CHAT = 1000;
+const MAX_MEDIA_BYTES = 20 * 1024 * 1024;
+const MAX_THUMB = 12000;
+const CHAT_MEDIA_ROOT = 'Mi Progreso - Chat (privado)';
+const MEDIA_MIME = /^data:((?:image\/(?:jpeg|png|webp))|(?:video\/(?:mp4|3gpp|webm|quicktime|x-matroska)));base64,(.+)$/;
+
+function chatMediaFolder() {
+  const props = PropertiesService.getScriptProperties();
+  const id = props.getProperty('CHAT_FOLDER_ID');
+  if (id) { try { return DriveApp.getFolderById(id); } catch (e) { } }
+  const it = DriveApp.getRootFolder().getFoldersByName(CHAT_MEDIA_ROOT);
+  const f = it.hasNext() ? it.next() : DriveApp.getRootFolder().createFolder(CHAT_MEDIA_ROOT);
+  props.setProperty('CHAT_FOLDER_ID', f.getId());
+  return f;
+}
+// Lo que ven las apps de un mensaje (sin el id del archivo en Drive)
+function chatOut(m) {
+  if (!m || !m.media) return m;
+  const o = JSON.parse(JSON.stringify(m));
+  delete o.media.fileId;
+  if (o.media.once) delete o.media.thumb;
+  return o;
+}
+function chatTrashMedia(m) {
+  if (!m || !m.media || !m.media.fileId) return;
+  try { DriveApp.getFileById(m.media.fileId).setTrashed(true); } catch (e) { }
+  m.media.fileId = '';
+}
+function chatMediaLabel(m) {
+  if (!m.media) return m.text;
+  const k = m.media.kind === 'video' ? '🎥 Video' : '📷 Foto';
+  return (m.media.once ? k + ' (ver una vez)' : k) + (m.text ? ' · ' + m.text : '');
+}
 
 function loadChat(folder) {
   const f = findFile(folder, CHAT_FILE);
@@ -744,28 +782,71 @@ const ACTIONS = {
   chat_send: function (body, folder) {
     const w = chatWho(body, requireRole(body, 'any'));
     const text = String(body.text || '').trim().slice(0, MAX_TEXTO_CHAT);
-    if (!text) throw new Error('El mensaje está vacío');
     const id = String(body.id || Utilities.getUuid()).replace(/[^a-zA-Z0-9_-]/g, '').slice(0, 64) || Utilities.getUuid();
+    let media = null, mediaBytes = null;
+    if (body.media && body.media.dataUrl) {
+      const mm = String(body.media.dataUrl).match(MEDIA_MIME);
+      if (!mm) throw new Error('Formato de archivo no permitido');
+      const kind = mm[1].indexOf('video/') === 0 ? 'video' : 'image';
+      const bytes = Utilities.base64Decode(mm[2]);
+      if (bytes.length > MAX_MEDIA_BYTES) throw new Error('El archivo pesa más de 20 MB');
+      mediaBytes = bytes;
+      const ext = { 'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp', 'video/mp4': 'mp4', 'video/3gpp': '3gp', 'video/webm': 'webm', 'video/quicktime': 'mov', 'video/x-matroska': 'mkv' }[mm[1]] || 'bin';
+      const once = body.media.once === true || body.media.once === 'true';
+      const thumb = String(body.media.thumb || '');
+      media = { kind: kind, once: once, mime: mm[1], size: bytes.length, ext: ext,
+        thumb: (!once && /^data:image\/jpeg;base64,/.test(thumb) && thumb.length <= MAX_THUMB) ? thumb : '',
+        w: Number(body.media.w) || 0, h: Number(body.media.h) || 0, dur: Number(body.media.dur) || 0, opened: 0, fileId: '' };
+    }
+    if (!text && !media) throw new Error('El mensaje está vacío');
     let saved = null;
     withLock(function () {
       const chat = loadChat(folder), t = chatThread(chat, w.thread);
       saved = t.messages.filter(function (m) { return m.id === id; })[0] || null;
       if (saved) return;                                   // reintento de un envío que ya llegó
+      if (media) {
+        const f = chatMediaFolder().createFile(Utilities.newBlob(mediaBytes, media.mime, 'chat_' + w.thread + '_' + id + '.' + media.ext));
+        media.fileId = f.getId();
+      }
       const last = t.messages.length ? Number(t.messages[t.messages.length - 1].ts) || 0 : 0;
       saved = { id: id, from: w.side, text: text, ts: Math.max(Date.now(), last + 1) };
+      if (media) saved.media = media;
       t.messages.push(saved);
-      if (t.messages.length > MAX_CHAT) t.messages = t.messages.slice(t.messages.length - MAX_CHAT);
+      if (t.messages.length > MAX_CHAT) { t.messages.slice(0, t.messages.length - MAX_CHAT).forEach(chatTrashMedia); t.messages = t.messages.slice(t.messages.length - MAX_CHAT); }
       t.read[w.side] = saved.ts;                            // lo mío cuenta como leído
       saveChat(folder, chat);
     });
-    return { ok: true, thread: w.thread, message: saved };
+    return { ok: true, thread: w.thread, message: chatOut(saved) };
+  },
+
+  chat_media: function (body, folder) {
+    const w = chatWho(body, requireRole(body, 'any'));
+    const id = String(body.id || '');
+    let out = null, err = '';
+    withLock(function () {
+      const chat = loadChat(folder), t = chatThread(chat, w.thread);
+      const m = t.messages.filter(function (x) { return x.id === id; })[0];
+      if (!m || !m.media) { err = 'Archivo no encontrado'; return; }
+      if (m.media.once) {
+        if (m.from === w.side) { err = 'Lo enviaste para ver una vez: solo lo puede abrir la otra persona'; return; }
+        if (m.media.opened) { err = 'Ya lo abriste (era para ver una vez)'; return; }
+      }
+      if (!m.media.fileId) { err = 'El archivo ya no está disponible'; return; }
+      let blob;
+      try { blob = DriveApp.getFileById(m.media.fileId).getBlob(); } catch (e) { err = 'El archivo ya no está disponible'; return; }
+      out = { kind: m.media.kind, once: !!m.media.once, mime: m.media.mime, dataUrl: 'data:' + m.media.mime + ';base64,' + Utilities.base64Encode(blob.getBytes()) };
+      if (m.media.once) { m.media.opened = Date.now(); chatTrashMedia(m); saveChat(folder, chat); }
+    });
+    if (!out) return { ok: false, error: err || 'No se pudo abrir' };
+    return { ok: true, id: id, media: out };
   },
 
   chat_list: function (body, folder) {
     const w = chatWho(body, requireRole(body, 'any'));
     const t = chatThread(loadChat(folder), w.thread);
     const since = Number(body.since) || 0;
-    const list = t.messages.filter(function (m) { return Number(m.ts) > since; }).slice(-200);
+    // Además de los nuevos, los "ver una vez" que se abrieron hace poco (para que quien los mandó vea "Abierta")
+    const list = t.messages.filter(function (m) { return Number(m.ts) > since || (m.media && m.media.once && Number(m.media.opened) > Date.now() - 3 * 86400000); }).slice(-200).map(chatOut);
     return {
       ok: true, thread: w.thread, me: w.side, messages: list,
       unread: chatUnread(t, w.side).length,
@@ -908,7 +989,7 @@ const ACTIONS = {
       });
       chatUnread(chatThread(loadChat(folder), userOf(body, role)), 'ella').forEach(function (m) {
         if (Date.now() - Number(m.ts) > 36 * 3600000) return;
-        items.push({ id: 'chat:' + m.id, title: '💬 Jaider', text: m.text, action: 'go:chat', button: 'Responder' });
+        items.push({ id: 'chat:' + m.id, title: '💬 Jaider', text: chatMediaLabel(m), action: 'go:chat', button: 'Responder' });
       });
     } else if (role === 'admin') {
       loadMessages(folder).forEach(function (m) {
@@ -925,7 +1006,7 @@ const ACTIONS = {
       ['ella', 'prueba'].forEach(function (th) {
         chatUnread(chatThread(chat, th), 'jaider').forEach(function (m) {
           if (Date.now() - Number(m.ts) > 36 * 3600000) return;
-          items.push({ id: 'chat:' + m.id, title: th === 'prueba' ? '💬 Chat (prueba)' : '💬 Ella', text: m.text, action: th === 'prueba' ? 'go:chat:prueba' : 'go:chat', button: 'Responder' });
+          items.push({ id: 'chat:' + m.id, title: th === 'prueba' ? '💬 Chat (prueba)' : '💬 Ella', text: chatMediaLabel(m), action: th === 'prueba' ? 'go:chat:prueba' : 'go:chat', button: 'Responder' });
         });
       });
       const hf = newestFile(folder, [HER_FILE].concat(HER_LEGACY_FILES));

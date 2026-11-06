@@ -22,6 +22,12 @@
   muestra una vista mínima (descanso, ejercicio, siguiente).
   Para recompilar classes7: `javac --release 8` de Ext2.java + Pip.java (con un stub de QuickWidget), `dalvik-exchange --dex`,
   `baksmali d`, copiar los .smali a `smali_classes7/` del `apktool d` y `apktool b`; luego copiar classes7.dex.
+- `fuente/Chooser.java` (8.5.13, en classes7.dex): el selector de archivos acepta videos. `Extra.configureChooser`
+  (classes4.dex, smali) lo llama al inicio; si la página pide `video/*` arma el Intent ahí, si no sigue igual que antes.
+- Fotos y videos en el chat (backend v18): van dentro de `chat_send` (`media.dataUrl`, fotos comprimidas a 1600 px en el
+  teléfono, videos de máx. 20 MB) y se bajan con `chat_media`. Los archivos están en "Mi Progreso - Chat (privado)" en la
+  raíz de Mi unidad (`CHAT_FOLDER_ID`). "Ver una vez": solo quien lo recibe, una vez; al abrirlo el archivo va a la
+  papelera. Para archivos grandes la app usa `fetch` directo al Apps Script (y `nxHttp` si falla).
 - `fuente/v850_comun.js`: el bloque 8.5.10 que va en las dos apps (antes de `initV7();`): chat, varias claves de IA,
   compartir la app libre, ventana flotante y (Jaider) aviso de pedidos de Ella. Si lo cambias, vuelve a pegarlo en los
   dos `index.html` reemplazando el bloque anterior.
