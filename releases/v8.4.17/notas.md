@@ -1,0 +1,2 @@
+- ✨ Textos y emojis más neutrales: sin corazones, mensajes con tono de entrenador
+- 🔔 Incluye las notificaciones con la app cerrada (8.4.16)
