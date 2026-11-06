@@ -1,6 +1,9 @@
 # Publica automáticamente la versión más alta que haya en releases/vX.Y.Z/
+# - Si alguna APK no está firmada con la clave de siempre, la firma con el secreto FIRMA_PEM
+#   (Settings → Secrets and variables → Actions). La clave nunca sale del secreto.
 # - Si el Release no existe, lo crea con las APK y lo marca como "Latest".
 # - Si ya existe, reemplaza sus APK (útil para corregir una versión) y lo deja como "Latest".
+# - "Run workflow" con solo_probar_firma = true: comprueba que el secreto firma bien, sin publicar nada.
 name: Publicar versión
 
 on:
@@ -8,6 +11,11 @@ on:
     branches: [main]
     paths: ['releases/**']
   workflow_dispatch:
+    inputs:
+      solo_probar_firma:
+        description: 'Solo probar que la firma con el secreto funciona (no publica)'
+        type: boolean
+        default: false
 
 permissions:
   contents: write
@@ -16,24 +24,88 @@ concurrency:
   group: publicar-version
   cancel-in-progress: false
 
+env:
+  CERT_SHA256: f7d6a22c1b257de37f8d7fa134e6b5755c1a94cb2d996648809fabda31fa0d7d
+
 jobs:
   publicar:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 
-      - name: Crear o actualizar el Release
-        env:
-          GH_TOKEN: ${{ github.token }}
+      - name: Preparar herramientas de firma
+        run: |
+          set -euo pipefail
+          SDK="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-}}"
+          BT=""
+          [ -n "$SDK" ] && BT=$(ls -d "$SDK"/build-tools/* 2>/dev/null | sort -V | tail -1 || true)
+          if [ -z "$BT" ] || [ ! -x "$BT/apksigner" ]; then
+            sudo apt-get update -qq && sudo apt-get install -y -qq apksigner zipalign
+            echo "APKSIGNER=apksigner" >> "$GITHUB_ENV"; echo "ZIPALIGN=zipalign" >> "$GITHUB_ENV"
+          else
+            echo "APKSIGNER=$BT/apksigner" >> "$GITHUB_ENV"; echo "ZIPALIGN=$BT/zipalign" >> "$GITHUB_ENV"
+          fi
+
+      - name: Elegir versión
         run: |
           set -euo pipefail
           shopt -s nullglob
           DIRS=(releases/v*/)
           [ ${#DIRS[@]} -gt 0 ] || { echo "No hay carpetas releases/vX.Y.Z"; exit 1; }
           DIR=$(printf '%s\n' "${DIRS[@]%/}" | sort -V | tail -1)
-          TAG=$(basename "$DIR")
+          echo "DIR=$DIR" >> "$GITHUB_ENV"; echo "TAG=$(basename "$DIR")" >> "$GITHUB_ENV"
+
+      - name: Firmar las APK que no estén firmadas
+        env:
+          FIRMA_PEM: ${{ secrets.FIRMA_PEM }}
+          PROBAR: ${{ github.event_name == 'workflow_dispatch' && inputs.solo_probar_firma }}
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+          K="$RUNNER_TEMP/firma"; mkdir -p "$K"; chmod 700 "$K"
+          trap 'rm -rf "$K"' EXIT
+          tiene_cert() { "$APKSIGNER" verify --print-certs "$1" > "$K/v.txt" 2>/dev/null || true; grep -q "$CERT_SHA256" "$K/v.txt"; }
+          preparar_clave() {
+            [ -n "${FIRMA_PEM:-}" ] || { echo "::error::Falta el secreto FIRMA_PEM (Settings → Secrets and variables → Actions)."; exit 1; }
+            [ -f "$K/key.pk8" ] && return 0
+            (umask 077; printf '%s\n' "$FIRMA_PEM" > "$K/clave.pem")
+            openssl pkcs8 -topk8 -nocrypt -in "$K/clave.pem" -outform DER -out "$K/key.pk8"
+            openssl x509 -in "$K/clave.pem" -outform DER -out "$K/cert.der"
+            rm -f "$K/clave.pem"
+          }
+          firmar() { # entrada salida
+            preparar_clave
+            "$ZIPALIGN" -f -p 4 "$1" "$K/alineada.apk"
+            "$APKSIGNER" sign --v4-signing-enabled false --key "$K/key.pk8" --cert "$K/cert.der" --out "$2" "$K/alineada.apk"
+            tiene_cert "$2" || { echo "::error::El certificado no coincide"; exit 1; }
+          }
+          if [ "$PROBAR" = "true" ]; then
+            for apk in "$DIR"/*.apk; do
+              python3 -c "import zipfile,sys;zi=zipfile.ZipFile(sys.argv[1]);zo=zipfile.ZipFile(sys.argv[2],'w');[zo.writestr(i,zi.read(i)) for i in zi.infolist() if not i.filename.startswith('META-INF/MP.')]" "$apk" "$K/sin_firma.apk"
+              firmar "$K/sin_firma.apk" "$K/prueba.apk"
+              echo "✅ La firma con el secreto funciona ($(basename "$apk"))"
+            done
+            exit 0
+          fi
+          for apk in "$DIR"/*.apk; do
+            if tiene_cert "$apk"; then
+              echo "Ya firmada: $apk"
+            else
+              echo "Firmando: $apk"
+              firmar "$apk" "$K/firmada.apk" && mv "$K/firmada.apk" "$apk"
+            fi
+          done
+
+      - name: Crear o actualizar el Release
+        if: ${{ !(github.event_name == 'workflow_dispatch' && inputs.solo_probar_firma) }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
           APKS=("$DIR"/*.apk)
           [ ${#APKS[@]} -gt 0 ] || { echo "No hay APK en $DIR"; exit 1; }
+          for apk in "${APKS[@]}"; do OUT=$("$APKSIGNER" verify --print-certs "$apk" 2>&1 || true); grep -q "$CERT_SHA256" <<<"$OUT" || { echo "::error::$apk sin la firma correcta"; exit 1; }; done
           echo "Versión: $TAG"; printf '  %s\n' "${APKS[@]}"
           NOTES=()
           [ -f "$DIR/notas.md" ] && NOTES=(--notes-file "$DIR/notas.md")

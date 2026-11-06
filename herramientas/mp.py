@@ -6,13 +6,17 @@ Herramienta para modificar y publicar Mi Progreso (app de Jaider y app de Ella).
       Descomprime las APK de la última versión en releases/ dentro de trabajo/jaider y trabajo/ella.
       Lo que normalmente se edita: trabajo/<app>/assets/index.html (toda la app es ese HTML).
 
-  python3 herramientas/mp.py publicar 8.4.18 --clave /ruta/clave_firma_MiProgreso.pem --notas "- Cambio 1" "- Cambio 2"
+  python3 herramientas/mp.py publicar 8.4.18 --notas "- Cambio 1" "- Cambio 2"
+      Sin --clave: deja las APK SIN firmar; al hacer push, GitHub Actions las firma con el secreto
+      FIRMA_PEM del repositorio (la clave nunca sale de ahí). Es la forma normal.
+  python3 herramientas/mp.py publicar 8.4.18 --clave /ruta/clave_firma_MiProgreso.pem --notas "..."
+      Con --clave: las firma aquí mismo (solo si tienes el archivo .pem).
       Sube la versión (APP_VERSION del HTML + versionName/versionCode del manifiesto), arma las dos APK
       a partir de trabajo/, las alinea, las firma con la MISMA clave, verifica el certificado y las deja en
       releases/v8.4.18/ con notas.md. Después solo falta git add/commit/push a main
       (la automatización "Publicar versión" crea el Release y lo marca como Latest).
 
-Requisitos (Ubuntu): apt-get install -y apksigner zipalign openssl
+Requisitos para firmar aquí (Ubuntu): apt-get install -y apksigner zipalign openssl
 Nunca subas la clave .pem al repositorio (es público).
 """
 import os, re, sys, glob, shutil, struct, zipfile, subprocess, argparse, tempfile
@@ -107,14 +111,19 @@ def publicar(a):
     os.makedirs(destino, exist_ok=True)
     tmp = tempfile.mkdtemp()
     key = os.path.join(tmp, 'key.pk8'); cert = os.path.join(tmp, 'cert.der')
-    run(['openssl', 'pkcs8', '-topk8', '-nocrypt', '-in', a.clave, '-outform', 'DER', '-out', key])
-    run(['openssl', 'x509', '-in', a.clave, '-outform', 'DER', '-out', cert])
+    if a.clave:
+        run(['openssl', 'pkcs8', '-topk8', '-nocrypt', '-in', a.clave, '-outform', 'DER', '-out', key])
+        run(['openssl', 'x509', '-in', a.clave, '-outform', 'DER', '-out', cert])
     try:
         for app in APPS:
             subir_version(app, vieja, nueva)
             sin = os.path.join(tmp, app + '_sin.apk'); ali = os.path.join(tmp, app + '_ali.apk')
             final = os.path.join(destino, APPS[app].format(v=nueva))
             armar(app, apk_base(app, vieja), sin)
+            if not a.clave:
+                shutil.copy(sin, final)
+                print('Sin firmar (la firma GitHub Actions):', os.path.relpath(final, RAIZ))
+                continue
             run(['zipalign', '-f', '-p', '4', sin, ali])
             run(['apksigner', 'sign', '--v4-signing-enabled', 'false', '--key', key, '--cert', cert, '--out', final, ali])
             out = run(['apksigner', 'verify', '--print-certs', final])
@@ -132,6 +141,6 @@ if __name__ == '__main__':
     p = argparse.ArgumentParser()
     s = p.add_subparsers(dest='cmd', required=True)
     s.add_parser('extraer')
-    q = s.add_parser('publicar'); q.add_argument('version'); q.add_argument('--clave', required=True); q.add_argument('--notas', nargs='*')
+    q = s.add_parser('publicar'); q.add_argument('version'); q.add_argument('--clave'); q.add_argument('--notas', nargs='*')
     a = p.parse_args()
     {'extraer': extraer, 'publicar': publicar}[a.cmd](a)
