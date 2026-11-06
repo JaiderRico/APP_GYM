@@ -1,0 +1,1 @@
+- 🤖 Arreglo: el coach IA, el modo libre y el resumen semanal vuelven a funcionar (usaban un modelo de IA que Groq retiró)
