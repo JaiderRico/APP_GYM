@@ -1,0 +1,1 @@
+- Mejoras internas (va a la par con las otras apps)

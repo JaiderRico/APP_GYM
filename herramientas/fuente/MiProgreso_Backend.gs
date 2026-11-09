@@ -1,5 +1,5 @@
 // ============================================================================
-// BACKEND MI PROGRESO v20 — Google Apps Script (respaldo en Drive + app de Ella)
+// BACKEND MI PROGRESO v21 — Google Apps Script (respaldo en Drive + app de Ella)
 // ============================================================================
 // NOVEDAD v12 — DATOS POR USUARIO:
 //   La app de Ella (8.4.13+) manda app:'ella' en cada llamada. Con eso el backend sabe
@@ -14,6 +14,9 @@
 // ============================================================================
 // Carpeta "Mi Progreso v8.0":
 // https://drive.google.com/drive/folders/1hUkPHwACKs533vFBA0_D4VymitggIXKD
+//
+// v21: lista de snacks de Ella compartida (snacks_ella.json). Ella la edita desde su app y Jaider desde la suya
+//      (sus sugerencias le llegan como notificación). snacks_get / snacks_edit.
 //
 // v20: chat más rápido. chat_list acepta rev (si nada cambió responde sin abrir Drive), markRead (marca leído en la
 //      misma llamada) y devuelve presencia: otherSeen (última vez), otherTyping y otherGot (hasta dónde recibió).
@@ -86,6 +89,9 @@
 //   chat_list      { code, app?, thread?, since? }   -> mensajes del chat y no leídos   (Ella o admin)
 //   chat_read      { code, app?, thread?, upTo? }    -> marca el chat como leído        (Ella o admin)
 //   chat_list      { …, rev?, markRead? }            -> (v20) unchanged:true si rev no cambió; otherSeen/otherTyping/otherGot
+//   snacks_get     { code, app?, user? }             -> (v21) { list:[{id,t,k,p,w,by,at}], updatedAt }  (Ella o admin)
+//   snacks_edit    { code, app?, user?, op:'add'|'upd'|'del'|'reset', item?, id? } -> lista nueva  (Ella o admin)
+//     · App de Ella: su lista (con el código admin, la de prueba). App de Jaider: user:'prueba' para la de prueba.
 //   chat_typing    { code, app?, thread? }           -> (v20) "escribiendo…" por 6 s (sin tocar Drive)
 //   chat_send      { …, since?, reply:{id}? }        -> (v20) también devuelve messages nuevos, rev y readByOther
 //   chat_send      { …, media:{ dataUrl, kind:'image'|'video', once, thumb?, w?, h?, dur? } } -> foto o video
@@ -117,7 +123,7 @@ function prop_(k, respaldo) {
 const CODIGO_ELLA  = prop_('CODIGO_ELLA',  "TU_CODIGO_SECRETO_AQUI");
 const CODIGO_ADMIN = prop_('CODIGO_ADMIN', "TU_CODIGO_ADMIN");
 const GROQ_API_KEY = prop_('GROQ_API_KEY', "TU_API_KEY_DE_GROQ");
-const BACKEND_VERSION = 'v20';
+const BACKEND_VERSION = 'v21';
 // Todas las claves de Groq configuradas, sin repetir y en orden (la principal primero).
 function groqKeys_() {
   const out = [];
@@ -427,7 +433,7 @@ function saveChat(folder, chat) {
 }
 // v20: "revisión" del chat en caché. Cambia con cada escritura; si la app ya la tiene, no hace falta leer Drive.
 function chatCache_() { return CacheService.getScriptCache(); }
-function chatBump_() { const r = String(Date.now()); try { chatCache_().put('chat_rev', r, 21600); } catch (e) { } return r; }
+function chatBump_() { const r = Date.now().toString(36) + Math.random().toString(36).slice(2, 7); try { chatCache_().put('chat_rev', r, 21600); } catch (e) { } return r; }
 function chatRev_() { let r = null; try { r = chatCache_().get('chat_rev'); } catch (e) { } return r; }
 function chatPresKey_(kind, thread, side) { return 'chat_' + kind + '_' + thread + '_' + side; }
 function chatPresence_(w) {
@@ -460,6 +466,47 @@ function chatWho(body, role) {
 function chatUnread(t, side) {
   const seen = Number(t.read[side]) || 0;
   return t.messages.filter(function (m) { return m.from !== side && Number(m.ts) > seen; });
+}
+
+// ============================================================================
+// Snacks de Ella (v21): altos en calorías y poco saciantes; ella y Jaider los editan
+// ============================================================================
+const SNACK_FILE = 'snacks_ella.json';
+const MAX_SNACKS = 40;
+const SNACKS_BASE = [
+  ['d1', 'Batido de leche entera con banano, avena molida y 1 cda de mantequilla de maní', 550, 20, 'Líquido: entra fácil y casi no llena.'],
+  ['d2', 'Puñado de maní o mezcla de frutos secos con uvas pasas (50 g)', 300, 10, 'Mucha energía en un bocado pequeño.'],
+  ['d3', 'Pan tostado con mantequilla de maní y miel', 350, 10, 'Pocas mordidas, muchas calorías.'],
+  ['d4', 'Queso con bocadillo', 300, 12, 'Clásico, rápido y denso en calorías.'],
+  ['d5', 'Vaso grande de leche entera achocolatada', 350, 14, 'Se toma en un minuto y no te quita el hambre de la comida.'],
+  ['d6', 'Yogur entero con granola y miel', 380, 12, 'Se come rápido y aporta bastante energía.'],
+  ['d7', 'Chocolatina con almendras o maní', 250, 5, 'Pequeña y muy calórica.'],
+  ['d8', 'Medio aguacate con galletas de soda y sal', 320, 5, 'Grasa buena: muchas calorías sin volumen.'],
+  ['d9', 'Dátiles o mango deshidratado (50 g) con un puñado de almendras', 300, 6, 'La fruta seca llena mucho menos que la fresca.'],
+  ['d10', 'Avena líquida con leche entera y canela', 300, 11, 'Bebida, no plato: entra sin esfuerzo.'],
+  ['d11', 'Galletas con arequipe', 260, 3, 'Para un antojo rápido entre comidas.'],
+  ['d12', 'Jugo de fruta en leche entera (mora, guanábana o mango)', 260, 9, 'Líquido y con azúcar natural: no sacia.']
+].map(function (x) { return { id: x[0], t: x[1], k: x[2], p: x[3], w: x[4], by: 'app', at: 0 }; });
+function snackUser_(body, role) {
+  if (fromHerApp(body)) return userOf(body, role);
+  if (role !== 'admin') throw new Error('Código inválido o faltante');
+  return String(body.user || '') === 'prueba' ? 'prueba' : 'ella';
+}
+function snackLoad_(folder, u) {
+  const f = findFile(folder, SNACK_FILE);
+  const d = f ? readJsonFile(f) : null;
+  const all = (d && d.users && typeof d.users === 'object') ? d.users : {};
+  const x = all[u];
+  return { all: all, list: (x && Array.isArray(x.list)) ? x.list : JSON.parse(JSON.stringify(SNACKS_BASE)), updatedAt: (x && x.updatedAt) || 0 };
+}
+function snackClean_(it, by, old) {
+  it = it || {};
+  const t = String(it.t || '').replace(/\s+/g, ' ').trim().slice(0, 120);
+  if (!t) throw new Error('Escribe el snack');
+  const num = function (v, max) { const n = Math.round(Number(v) || 0); return Math.max(0, Math.min(max, n)); };
+  return { id: (old && old.id) || ('s' + Date.now().toString(36) + Math.floor(Math.random() * 1e6).toString(36)),
+    t: t, k: num(it.k, 3000), p: num(it.p, 300), w: String(it.w || '').trim().slice(0, 100),
+    by: (old && old.by) || by, at: (old && old.at) || Date.now(), ...(old ? { editedBy: by, editedAt: Date.now() } : {}) };
 }
 
 // ============================================================================
@@ -979,6 +1026,41 @@ const ACTIONS = {
     };
   },
 
+  snacks_get: function (body, folder) {
+    const role = requireRole(body, 'any'), u = snackUser_(body, role);
+    const s = snackLoad_(folder, u);
+    return { ok: true, user: u, list: s.list, updatedAt: s.updatedAt };
+  },
+
+  snacks_edit: function (body, folder) {
+    const role = requireRole(body, 'any'), u = snackUser_(body, role);
+    const by = fromHerApp(body) ? 'ella' : 'jaider';
+    const op = String(body.op || '');
+    let out = null;
+    withLock(function () {
+      const s = snackLoad_(folder, u);
+      let list = s.list;
+      if (op === 'add') {
+        if (list.length >= MAX_SNACKS) throw new Error('La lista ya tiene ' + MAX_SNACKS + ' snacks: quita alguno primero');
+        list.push(snackClean_(body.item, by, null));
+      } else if (op === 'upd') {
+        const id = String((body.item && body.item.id) || body.id || '');
+        const i = list.findIndex(function (x) { return x.id === id; });
+        if (i < 0) throw new Error('Ese snack ya no está en la lista');
+        list[i] = snackClean_(body.item, by, list[i]);
+      } else if (op === 'del') {
+        const id = String(body.id || '');
+        list = list.filter(function (x) { return x.id !== id; });
+      } else if (op === 'reset') {
+        list = JSON.parse(JSON.stringify(SNACKS_BASE));
+      } else throw new Error('Operación inválida');
+      s.all[u] = { list: list, updatedAt: Date.now() };
+      upsertFile(folder, SNACK_FILE, JSON.stringify({ updatedAt: new Date().toISOString(), users: s.all }, null, 2));
+      out = { ok: true, user: u, list: list, updatedAt: s.all[u].updatedAt };
+    });
+    return out;
+  },
+
   // v20: "escribiendo…" (solo caché, no toca Drive)
   chat_typing: function (body) {
     const w = chatWho(body, requireRole(body, 'any'));
@@ -1117,6 +1199,10 @@ const ACTIONS = {
         if (Date.now() - Number(q.updatedAt) > 36 * 3600000) return;
         const t = q.status === 'hecho' ? '✅ Tu pedido para la app está listo' : q.status === 'en_proceso' ? '🛠 Jaider está trabajando en tu pedido' : '💡 Jaider revisó tu pedido';
         items.push({ id: 'ped:' + q.id + ':' + q.status, title: t, text: q.text + (q.note ? ' · ' + q.note : ''), action: 'go:requests' });
+      });
+      snackLoad_(folder, userOf(body, role)).list.forEach(function (x) {
+        if (x.by !== 'jaider' || Date.now() - Number(x.at) > 36 * 3600000) return;
+        items.push({ id: 'snk:' + x.id, title: '🥤 Jaider te sugirió un snack', text: x.t + (x.k ? ' · ~' + x.k + ' kcal' : ''), action: 'go:food' });
       });
       chatUnread(chatThread(loadChat(folder), userOf(body, role)), 'ella').forEach(function (m) {
         if (Date.now() - Number(m.ts) > 36 * 3600000) return;

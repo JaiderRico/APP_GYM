@@ -18,8 +18,10 @@
       }
       const nov=$('#v88Over');if(nov)return ()=>v88NovSeen();
       const h87=$('#h87Over');if(h87)return ()=>h87.querySelector('[data-h87-ok]')?.click();
+      if($('#v89Ed'))return ()=>v89Close();
       const mods=[...document.querySelectorAll('.modal:not(.hidden)')].filter(v88Vis);
-      if(mods.length){const m=mods[mods.length-1],b=m.querySelector('.modal-head button');return ()=>{if(b)b.click();else m.classList.add('hidden')}}
+      // El botón de cerrar de la ventana (no el de actualizar ↻ que algunas tienen al lado)
+      if(mods.length){const m=mods[mods.length-1],hb=[...m.querySelectorAll('.modal-head button')],b=hb.find(x=>/^\s*(✕|×|Cerrar|Volver|Listo)/.test(x.textContent||''))||hb[hb.length-1];return ()=>{if(b)b.click();else m.classList.add('hidden')}}
       const fm=$('#fmOverlay');
       if(fm){const b=[...fm.querySelectorAll('[data-fm-back]')].find(v88Vis)||fm.querySelector('[data-fm-min]');return ()=>b?.click()}
       // Otras ventanas a pantalla completa (role=dialog) que tengan botón de cerrar o volver
@@ -52,6 +54,11 @@
   // a: j = Mi Progreso (Jaider), e = Ella, l = Libre. Al publicar una versión, agrega arriba su entrada.
   const V88_APP=(typeof MP_PUBLICA!=='undefined'&&MP_PUBLICA)?'l':(MP_APK_IS_ELLA?'e':'j');
   const V88_NOV=[
+    {v:'8.5.19',f:'2026-11-08',i:[
+      ['e','🥤 Tu lista de snacks se puede editar: en Comida → “✏️ Mi lista” quita los que no uses y agrega los tuyos.'],
+      ['e','💡 Jaider te puede sugerir snacks: te llega una notificación y salen primero, marcados “Nuevo de Jaider”.'],
+      ['j','🥤 En “Progreso de Ella” → Snacks de Ella ves su lista y le puedes sugerir snacks (le llega notificación) o corregirlos.'],
+      ['j','◀ Volver: en las ventanas que tienen ↻ ahora se cierra la ventana (antes podía actualizarla).']]},
     {v:'8.5.18',f:'2026-11-08',i:[
       ['je','💬 Chat renovado, estilo WhatsApp: tu mensaje sale al instante (🕓 → ✓ enviado → ✓✓ recibido → ✓✓ azul leído), ves “en línea” y “escribiendo…”, y los mensajes llegan más rápido.'],
       ['je','↩ Responder un mensaje: deslízalo a la derecha, o mantenlo presionado → Responder / Copiar. Toca la cita para ir al mensaje original.'],

@@ -15,7 +15,7 @@
   del último Release y podrían bajar la libre.
 - Toda la interfaz y la lógica están en `assets/index.html` dentro de cada APK.
 - No hay proyecto de Android Studio: se edita la APK publicada más reciente y se vuelve a firmar.
-- `fuente/MiProgreso_Backend.gs` (v20): el backend (Google Apps Script). Las claves NO están en el código: viven en las Propiedades del script (CODIGO_ELLA, CODIGO_ADMIN, GROQ_API_KEY).
+- `fuente/MiProgreso_Backend.gs` (v21): el backend (Google Apps Script). Las claves NO están en el código: viven en las Propiedades del script (CODIGO_ELLA, CODIGO_ADMIN, GROQ_API_KEY).
   Al hacer push de un cambio a este archivo, el workflow **Actualizar Apps Script** lo sube con clasp, actualiza la misma implementación (la URL no cambia) y comprueba `?action=health`.
 - `fuente/MsgPoll.java`: código nativo que hace las notificaciones con la app cerrada (ya está dentro de las APK como classes6.dex, y `Reminders.onReceive` lo llama).
 - `fuente/Pip.java` (8.5.10, en classes7.dex): ventana flotante. La página usa `NativeStore.savePhoto('__pip__', 'supported'|'enter:9:16'|'auto:1'|'auto:0'|'active')`
@@ -44,6 +44,13 @@
   (versión, fecha y textos marcados `j`/`e`/`l` para cada app), se ve siempre en Ajustes → 🆕 Novedades y una vez al
   actualizar (`mp_nov_seen_v1`). **En cada versión nueva agrega arriba su entrada en `V88_NOV`** y pega el bloque en los
   dos `index.html` justo antes de `initV7();` (en la de Ella después de v870). La libre lo hereda de la de Jaider.
+- `fuente/v890_snacks.js` (8.5.19, apps de **Jaider y Ella**; la libre lo trae apagado por `MP_PUBLICA`): editor de la
+  lista de snacks de Ella, guardada en el servidor (`snacks_ella.json`, acciones `snacks_get` / `snacks_edit` con
+  `op: add|upd|del|reset`, backend v21; usuario `ella` o `prueba` como el resto). Ella lo abre desde Comida → “✏️ Mi lista”;
+  Jaider desde “Progreso de Ella” → Snacks de Ella (con 🧪 Prueba). Cada snack: `{id,t,k,p,w,by,at}`; `by:'jaider'` = sugerencia
+  (a ella le llega notificación por `pending_notifications` y sale primero 3 días como “Nuevo de Jaider”). La lista
+  base está en el backend (`SNACKS_BASE`) y en v870 (`H87_IDEAS`, para usar sin conexión): si cambias una, cambia la otra.
+  Va antes de `initV7();`, después de v880, en los dos `index.html`.
 - `fuente/v870_ella_comidas.js` (8.5.17, **solo app de Ella**): registrar comidas es obligatorio (la pestaña Comida
   siempre está, el cuestionario ya no lo pregunta) y 3 snacks al día altos en calorías y poco saciantes (le cuesta comer):
   tarjeta arriba en Comida con ideas y botón "+ Lo comí" (se guarda como comida tipo `snack` con kcal/proteína), aviso en

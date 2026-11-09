@@ -1,24 +1,33 @@
-  /* ===================== v8.5.17 (solo app de Ella): registrar comidas siempre + snacks que suman calorías sin llenar ===================== */
+  /* ===================== v8.5.17 (+8.5.19 lista editable) (solo app de Ella): registrar comidas siempre + snacks que suman calorías sin llenar ===================== */
   // A ella le cuesta comer: la pestaña Comida queda siempre activa, la app le pide registrar las comidas y varias
   // veces al día le recomienda un snack alto en calorías y poco saciante (líquidos, frutos secos, grasas buenas…).
   const H87_SLOTS=[['snack1','10:30'],['snack2','16:00'],['snack3','21:00']];
   const H87_IDEAS=[
-    {t:'Batido de leche entera con banano, avena molida y 1 cda de mantequilla de maní',k:550,p:20,w:'Líquido: entra fácil y casi no llena.'},
-    {t:'Puñado de maní o mezcla de frutos secos con uvas pasas (50 g)',k:300,p:10,w:'Mucha energía en un bocado pequeño.'},
-    {t:'Pan tostado con mantequilla de maní y miel',k:350,p:10,w:'Pocas mordidas, muchas calorías.'},
-    {t:'Queso con bocadillo',k:300,p:12,w:'Clásico, rápido y denso en calorías.'},
-    {t:'Vaso grande de leche entera achocolatada',k:350,p:14,w:'Se toma en un minuto y no te quita el hambre de la comida.'},
-    {t:'Yogur entero con granola y miel',k:380,p:12,w:'Se come rápido y aporta bastante energía.'},
-    {t:'Chocolatina con almendras o maní',k:250,p:5,w:'Pequeña y muy calórica.'},
-    {t:'Medio aguacate con galletas de soda y sal',k:320,p:5,w:'Grasa buena: muchas calorías sin volumen.'},
-    {t:'Dátiles o mango deshidratado (50 g) con un puñado de almendras',k:300,p:6,w:'La fruta seca llena mucho menos que la fresca.'},
-    {t:'Avena líquida con leche entera y canela',k:300,p:11,w:'Bebida, no plato: entra sin esfuerzo.'},
-    {t:'Galletas con arequipe',k:260,p:3,w:'Para un antojo rápido entre comidas.'},
-    {t:'Jugo de fruta en leche entera (mora, guanábana o mango)',k:260,p:9,w:'Líquido y con azúcar natural: no sacia.'}
+    {id:'d1',t:'Batido de leche entera con banano, avena molida y 1 cda de mantequilla de maní',k:550,p:20,w:'Líquido: entra fácil y casi no llena.'},
+    {id:'d2',t:'Puñado de maní o mezcla de frutos secos con uvas pasas (50 g)',k:300,p:10,w:'Mucha energía en un bocado pequeño.'},
+    {id:'d3',t:'Pan tostado con mantequilla de maní y miel',k:350,p:10,w:'Pocas mordidas, muchas calorías.'},
+    {id:'d4',t:'Queso con bocadillo',k:300,p:12,w:'Clásico, rápido y denso en calorías.'},
+    {id:'d5',t:'Vaso grande de leche entera achocolatada',k:350,p:14,w:'Se toma en un minuto y no te quita el hambre de la comida.'},
+    {id:'d6',t:'Yogur entero con granola y miel',k:380,p:12,w:'Se come rápido y aporta bastante energía.'},
+    {id:'d7',t:'Chocolatina con almendras o maní',k:250,p:5,w:'Pequeña y muy calórica.'},
+    {id:'d8',t:'Medio aguacate con galletas de soda y sal',k:320,p:5,w:'Grasa buena: muchas calorías sin volumen.'},
+    {id:'d9',t:'Dátiles o mango deshidratado (50 g) con un puñado de almendras',k:300,p:6,w:'La fruta seca llena mucho menos que la fresca.'},
+    {id:'d10',t:'Avena líquida con leche entera y canela',k:300,p:11,w:'Bebida, no plato: entra sin esfuerzo.'},
+    {id:'d11',t:'Galletas con arequipe',k:260,p:3,w:'Para un antojo rápido entre comidas.'},
+    {id:'d12',t:'Jugo de fruta en leche entera (mora, guanábana o mango)',k:260,p:9,w:'Líquido y con azúcar natural: no sacia.'}
   ];
   const H87_TIPS='Mejor líquidos y bocados pequeños: llenan menos. Cómelo 2 a 3 horas antes de la siguiente comida y deja el agua para después, no antes.';
   const h87Day=d=>Math.floor(parseD(d).getTime()/DAY_MS);
-  function h87Idea(d,i){return H87_IDEAS[((h87Day(d)*3+i)%H87_IDEAS.length+H87_IDEAS.length)%H87_IDEAS.length]}
+  // 8.5.19: la lista viene del servidor (la editan ella y Jaider, ver v890); sin conexión, la de siempre.
+  function h87List(){try{const c=typeof v89Cached==='function'?v89Cached():null;if(c)return c.list}catch{}return H87_IDEAS}
+  const h87New=x=>x&&x.by==='jaider'&&Date.now()-(Number(x.at)||0)<3*DAY_MS;
+  function h87Idea(d,i){
+    const L=h87List();if(!L.length)return null;
+    const nu=L.filter(h87New),rest=L.filter(x=>!h87New(x)),ord=nu.length&&d===today()?[...nu,...rest]:L;
+    const k=nu.length&&d===today()?i:h87Day(d)*3+i;
+    return ord[((k%ord.length)+ord.length)%ord.length];
+  }
+  const h87ById=id=>h87List().find(x=>x.id===id)||H87_IDEAS.find(x=>x.id===id);
   const h87Snacks=d=>(data.meals||[]).filter(m=>m.date===d&&m.type==='snack');
   let h87Shift=0;
 
@@ -45,13 +54,14 @@
   </style>`);
 
   function h87CardHtml(d){
-    const n=h87Snacks(d).length,goal=H87_SLOTS.length,ideas=[0,1,2].map(i=>h87Idea(d,i+h87Shift*3));
+    const n=h87Snacks(d).length,goal=H87_SLOTS.length,L=h87List(),cnt=Math.min(3,L.length),ideas=[];
+    for(let i=0;i<cnt;i++){const x=h87Idea(d,i+h87Shift*3);if(x&&!ideas.includes(x))ideas.push(x)}
     return `<div class="card h87-card" id="h87Card"><div class="row" style="justify-content:space-between"><strong>🥤 Snacks para sumar calorías</strong><span class="small">${Math.min(n,goal)}/${goal} hoy</span></div>
       <div class="h87-bar"><i style="width:${Math.min(100,Math.round(n/goal*100))}%"></i></div>
       <p class="small" style="margin:4px 0 6px">Registrar todo lo que comes es parte del plan: sin registro no hay forma de saber si estás comiendo lo suficiente. Además de tus comidas, come ${goal} snacks al día que te den energía sin llenarte.</p>
-      ${ideas.map((x,i)=>`<div class="h87-idea"><div><b>${esc(x.t)}</b><span>~${x.k} kcal · ${esc(x.w)}</span></div><button class="secondary" data-h87-add="${i}" data-h87-day="${esc(d)}">+ Lo comí</button></div>`).join('')}
+      ${ideas.length?ideas.map(x=>`<div class="h87-idea"><div><b>${esc(x.t)}</b><span>${h87New(x)?'💡 <b style="display:inline;font-size:12px">Nuevo de Jaider</b> · ':''}${x.k?`~${x.k} kcal`:''}${x.w?` · ${esc(x.w)}`:''}</span></div><button class="secondary" data-h87-add="${esc(x.id)}" data-h87-day="${esc(d)}">+ Lo comí</button></div>`).join(''):'<p class="small">Tu lista de snacks está vacía. Agrega los que te gusten.</p>'}
       <p class="small" style="margin:8px 0 0">💡 ${esc(H87_TIPS)}</p>
-      <button class="secondary" data-h87-more style="width:100%;margin-top:8px">Ver otras ideas</button></div>`;
+      <div class="row" style="gap:8px;margin-top:8px">${L.length>3?'<button class="secondary" data-h87-more style="flex:1;margin:0">Ver otras ideas</button>':''}<button class="secondary" data-v89-open style="flex:1;margin:0">✏️ Mi lista (${L.length})</button></div></div>`;
   }
 
   const _h87Food=renderFood;
@@ -69,7 +79,7 @@
       const t=today(),now=new Date(),hm=now.getHours()*60+now.getMinutes(),r=s81().reminders;
       const due=H87_SLOTS.filter(([k,v])=>{const [h,m]=String(r[k]||v).split(':').map(Number);return hm>=h*60+m}).length;
       const n=h87Snacks(t).length;
-      if(due>n){const x=h87Idea(t,n);extra=`<div class="card her-banner" data-her-go="food"><div class="ic">🥤</div><div><strong>Toca tu snack ${n+1} de ${H87_SLOTS.length}</strong><span class="small">Idea: ${esc(x.t)} (~${x.k} kcal). Regístralo cuando lo comas.</span></div><span class="go">›</span></div>`}
+      const x=h87Idea(t,n);if(due>n&&x){extra=`<div class="card her-banner" data-her-go="food"><div class="ic">🥤</div><div><strong>Toca tu snack ${n+1} de ${H87_SLOTS.length}</strong><span class="small">Idea: ${esc(x.t)} (~${x.k} kcal). Regístralo cuando lo comas.</span></div><span class="go">›</span></div>`}
     }catch(e){console.error(e)}
     return extra+_h87Banners.apply(this,arguments);
   };
@@ -84,7 +94,7 @@
       H87_SLOTS.forEach(([k,v],i)=>{
         const time=r[k]||v;let at=tsAt(t,time),d=t;
         if(at<=now||n>i){at=tsAt(tm,time);d=tm}
-        const x=h87Idea(d,i);
+        const x=h87Idea(d,i)||H87_IDEAS[i];
         out.push({id:'h87_'+k,at,repeat:DAY_MS,maxLate:2*3600000,title:`🥤 Hora de tu snack (${i+1} de ${H87_SLOTS.length})`,text:`${x.t} · ~${x.k} kcal. ${x.w} Regístralo al comerlo.`,action:'food:new:snack',button:'Registrar'});
       });
     }catch(e){console.error(e)}
@@ -139,7 +149,7 @@
   document.addEventListener('click',e=>{
     const t=e.target;
     const a=t.closest('[data-h87-add]');
-    if(a){const d=a.dataset.h87Day||today(),x=h87Idea(d,Number(a.dataset.h87Add)+h87Shift*3);
+    if(a){const d=a.dataset.h87Day||today(),x=h87ById(a.dataset.h87Add);if(!x)return;
       data.meals.push({id:uid(),date:d,type:'snack',text:x.t,protein:x.p,kcal:x.k,createdAt:Date.now()});
       persist(true);try{renderFood()}catch{}try{renderToday()}catch{}try{pushReminders()}catch{}
       const n=h87Snacks(d).length;toast(n>=H87_SLOTS.length?`✓ Snack registrado. ¡Llevas ${n} hoy, muy bien!`:`✓ Snack registrado (${n} de ${H87_SLOTS.length}).`);return}

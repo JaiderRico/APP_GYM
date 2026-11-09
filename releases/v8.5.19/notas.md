@@ -1,0 +1,3 @@
+- 🥤 (Ella) La lista de snacks se puede editar: quita los que no uses y agrega los tuyos (Comida → ✏️ Mi lista)
+- 💡 (Jaider) En Progreso de Ella → Snacks de Ella le sugieres snacks; a ella le llega notificación y salen primero
+- ◀ Volver en Progreso de Ella cierra la ventana (antes podía actualizarla)
