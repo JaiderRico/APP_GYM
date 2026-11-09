@@ -54,6 +54,11 @@
   // a: j = Mi Progreso (Jaider), e = Ella, l = Libre. Al publicar una versión, agrega arriba su entrada.
   const V88_APP=(typeof MP_PUBLICA!=='undefined'&&MP_PUBLICA)?'l':(MP_APK_IS_ELLA?'e':'j');
   const V88_NOV=[
+    {v:'8.5.20',f:'2026-11-08',i:[
+      ['j','👩 Pantalla de seguimiento de Ella (tarjeta de Inicio): resumen, accesos a chat, snacks, pedidos y mensajes, y todo su historial.'],
+      ['j','🏋️ Sus entrenos completos, con filtro por fechas (o un solo día) y por ejercicio: ves cada serie y, por ejercicio, su mejor serie y cómo va.'],
+      ['j','🍽 Sus comidas por día (qué, a qué hora lo anotó, calorías, proteína y snacks) y su peso y medidas. Botón 💬 Comentarle para escribirle sobre eso.'],
+      ['e','👀 Seguimiento: Jaider puede ver tus entrenos, comidas y peso de tu copia en la nube para darte consejos. Te escribe por el chat.']]},
     {v:'8.5.19',f:'2026-11-08',i:[
       ['e','🥤 Tu lista de snacks se puede editar: en Comida → “✏️ Mi lista” quita los que no uses y agrega los tuyos.'],
       ['e','💡 Jaider te puede sugerir snacks: te llega una notificación y salen primero, marcados “Nuevo de Jaider”.'],

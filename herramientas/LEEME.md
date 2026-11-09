@@ -44,6 +44,12 @@
   (versión, fecha y textos marcados `j`/`e`/`l` para cada app), se ve siempre en Ajustes → 🆕 Novedades y una vez al
   actualizar (`mp_nov_seen_v1`). **En cada versión nueva agrega arriba su entrada en `V88_NOV`** y pega el bloque en los
   dos `index.html` justo antes de `initV7();` (en la de Ella después de v870). La libre lo hereda de la de Jaider.
+- `fuente/v900_seguimiento.js` (8.5.20, **solo app de Jaider**; la libre lo trae apagado): pantalla de seguimiento de Ella
+  (`#v90`). La tarjeta de Inicio "Progreso de Ella" (`#hmEntry`) la abre; desde ahí: chat, snacks, pedidos y "Mensajes y
+  rutinas" (la ventana vieja `openHerModal`). Pestañas: Resumen, Entrenos (filtro por fechas/un día y por ejercicio, con
+  mejor serie y tendencia), Comidas por día (marca los días sin registro) y Peso/medidas. Lee `get_her_data` (su copia
+  completa en la nube; reutiliza `hmState.raw`). "💬 Comentarle" abre el chat con el texto empezado. Va antes de `initV7();`
+  en el `index.html` de Jaider (después de v890). En la de Ella, Novedades le avisa que Jaider ve sus entrenos y comidas.
 - `fuente/v890_snacks.js` (8.5.19, apps de **Jaider y Ella**; la libre lo trae apagado por `MP_PUBLICA`): editor de la
   lista de snacks de Ella, guardada en el servidor (`snacks_ella.json`, acciones `snacks_get` / `snacks_edit` con
   `op: add|upd|del|reset`, backend v21; usuario `ella` o `prueba` como el resto). Ella lo abre desde Comida → “✏️ Mi lista”;

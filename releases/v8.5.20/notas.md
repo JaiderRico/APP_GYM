@@ -1,0 +1,3 @@
+- 👩 (Jaider) Pantalla de seguimiento de Ella: historial completo de entrenos filtrable por fechas y ejercicio, comidas por día, peso y medidas, y accesos a chat, snacks y pedidos
+- 💬 (Jaider) Botón Comentarle para escribirle sobre un entreno o un día de comidas
+- 👀 (Ella) Novedades: aviso de que Jaider ve tus entrenos, comidas y peso para darte seguimiento
