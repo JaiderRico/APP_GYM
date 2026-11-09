@@ -1,5 +1,5 @@
 // ============================================================================
-// BACKEND MI PROGRESO v21 — Google Apps Script (respaldo en Drive + app de Ella)
+// BACKEND MI PROGRESO v22 — Google Apps Script (respaldo en Drive + app de Ella)
 // ============================================================================
 // NOVEDAD v12 — DATOS POR USUARIO:
 //   La app de Ella (8.4.13+) manda app:'ella' en cada llamada. Con eso el backend sabe
@@ -14,6 +14,10 @@
 // ============================================================================
 // Carpeta "Mi Progreso v8.0":
 // https://drive.google.com/drive/folders/1hUkPHwACKs533vFBA0_D4VymitggIXKD
+//
+// v22: autorizarIA(): ejecútala UNA vez desde el editor (▶ Ejecutar) para darle al script el permiso de conectarse
+//      a internet (UrlFetchApp), que necesita la IA desde v19. Sin ese permiso la IA responde un aviso claro.
+//      health devuelve iaPermiso (true/false) y la automatización de GitHub avisa si falta.
 //
 // v21: lista de snacks de Ella compartida (snacks_ella.json). Ella la edita desde su app y Jaider desde la suya
 //      (sus sugerencias le llegan como notificación). snacks_get / snacks_edit.
@@ -123,7 +127,7 @@ function prop_(k, respaldo) {
 const CODIGO_ELLA  = prop_('CODIGO_ELLA',  "TU_CODIGO_SECRETO_AQUI");
 const CODIGO_ADMIN = prop_('CODIGO_ADMIN', "TU_CODIGO_ADMIN");
 const GROQ_API_KEY = prop_('GROQ_API_KEY', "TU_API_KEY_DE_GROQ");
-const BACKEND_VERSION = 'v21';
+const BACKEND_VERSION = 'v22';
 // Todas las claves de Groq configuradas, sin repetir y en orden (la principal primero).
 function groqKeys_() {
   const out = [];
@@ -192,6 +196,26 @@ function aiLlamar_(payload, keys, fetchFn) {
     cache.put(aiCoolKey_(k), '1', st === 429 ? Math.min(21600, Math.max(ra, 300)) : 21600);
   }
   return last;
+}
+
+// v22: el permiso para conectarse a internet (UrlFetchApp) lo da el dueño del script una sola vez.
+const AVISO_PERMISO_IA = 'La IA del servidor aún no tiene permiso para conectarse. Jaider: abre el Apps Script, elige la función autorizarIA y dale ▶ Ejecutar (una sola vez).';
+function esFaltaPermiso_(e) { return /permiso|permission|external_request|autoriz|authoriz/i.test(String(e && e.message || e)); }
+function iaPermiso_() {
+  try {
+    UrlFetchApp.fetch('https://api.groq.com/openai/v1/models', { muteHttpExceptions: true, headers: { Authorization: 'Bearer ' + (groqKeys_()[0] || 'x') } });
+    return true;
+  } catch (e) { return esFaltaPermiso_(e) ? false : true; }
+}
+// ▶ Ejecuta esta función desde el editor (una sola vez) y acepta los permisos que pide Google.
+function autorizarIA() {
+  const keys = groqKeys_();
+  Logger.log('Claves de IA configuradas: ' + keys.length);
+  keys.forEach(function (k, i) {
+    const r = UrlFetchApp.fetch('https://api.groq.com/openai/v1/models', { muteHttpExceptions: true, headers: { Authorization: 'Bearer ' + k } });
+    Logger.log('Clave ' + (i + 1) + ' (…' + k.slice(-4) + '): ' + (r.getResponseCode() === 200 ? 'funciona ✓' : 'responde ' + r.getResponseCode()));
+  });
+  Logger.log('Listo: la IA de las apps ya puede usar el servidor.');
 }
 
 function clavesConfiguradas_() {
@@ -594,7 +618,12 @@ const ACTIONS = {
     const quien = aiQuien_(body);
     const payload = aiValidar_(body.req);
     aiLimite_(quien);
-    const r = aiLlamar_(payload, groqKeys_(), function (u, o) { return UrlFetchApp.fetch(u, o); });
+    let r;
+    try { r = aiLlamar_(payload, groqKeys_(), function (u, o) { return UrlFetchApp.fetch(u, o); }); }
+    catch (e) {
+      if (esFaltaPermiso_(e)) throw new Error(AVISO_PERMISO_IA);
+      throw e;
+    }
     return { ok: true, status: r.status, body: r.body, retryAfter: r.retryAfter || 0 };
   },
 
@@ -1175,7 +1204,7 @@ const ACTIONS = {
 
   // Comprobación para la automatización de GitHub (no revela ninguna clave).
   health: function () {
-    return { ok: true, version: BACKEND_VERSION, clavesConfiguradas: clavesConfiguradas_(), clavesIA: groqKeys_().length };
+    return { ok: true, version: BACKEND_VERSION, clavesConfiguradas: clavesConfiguradas_(), clavesIA: groqKeys_().length, iaPermiso: iaPermiso_() };
   },
 
   // Novedades para notificar con la app cerrada (la app consulta cada ~15 min).

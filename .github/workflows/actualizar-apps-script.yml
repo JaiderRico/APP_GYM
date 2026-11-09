@@ -80,6 +80,9 @@ jobs:
           echo "$R" | jq -e '.ok == true' >/dev/null || { echo "::error::El Apps Script no respondió bien"; exit 1; }
           [ -z "$ESPERADA" ] || [ "$V" = "$ESPERADA" ] || { echo "::error::El Apps Script sigue respondiendo $V y no $ESPERADA"; exit 1; }
           echo "$R" | jq -e '.clavesConfiguradas == true' >/dev/null || { echo "::error::Faltan CODIGO_ELLA / CODIGO_ADMIN en Propiedades del script. Las apps no podrán entrar hasta agregarlas."; exit 1; }
+          if echo "$R" | jq -e '.iaPermiso == false' >/dev/null; then
+            echo "::warning::El Apps Script no tiene permiso para conectarse a internet (UrlFetchApp): la IA de las apps no funciona. Ábrelo en script.google.com, elige la función autorizarIA y dale ▶ Ejecutar una vez (acepta los permisos)."
+          fi
 
       - name: Limpiar credenciales
         if: always()

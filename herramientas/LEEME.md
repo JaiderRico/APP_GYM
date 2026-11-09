@@ -15,7 +15,7 @@
   del último Release y podrían bajar la libre.
 - Toda la interfaz y la lógica están en `assets/index.html` dentro de cada APK.
 - No hay proyecto de Android Studio: se edita la APK publicada más reciente y se vuelve a firmar.
-- `fuente/MiProgreso_Backend.gs` (v21): el backend (Google Apps Script). Las claves NO están en el código: viven en las Propiedades del script (CODIGO_ELLA, CODIGO_ADMIN, GROQ_API_KEY).
+- `fuente/MiProgreso_Backend.gs` (v22): el backend (Google Apps Script). Las claves NO están en el código: viven en las Propiedades del script (CODIGO_ELLA, CODIGO_ADMIN, GROQ_API_KEY).
   Al hacer push de un cambio a este archivo, el workflow **Actualizar Apps Script** lo sube con clasp, actualiza la misma implementación (la URL no cambia) y comprueba `?action=health`.
 - `fuente/MsgPoll.java`: código nativo que hace las notificaciones con la app cerrada (ya está dentro de las APK como classes6.dex, y `Reminders.onReceive` lo llama).
 - `fuente/Pip.java` (8.5.10, en classes7.dex): ventana flotante. La página usa `NativeStore.savePhoto('__pip__', 'supported'|'enter:9:16'|'auto:1'|'auto:0'|'active')`
@@ -109,6 +109,10 @@
 - Chat (backend v15): `chat_send` / `chat_list` / `chat_read`, guardado en `chat_mi_progreso.json`. La app de Ella con su
   código usa el chat "ella"; con el código admin (prueba) usa "prueba". En la app de Jaider el botón 🧪 Prueba muestra ese.
   `pending_notifications` avisa los mensajes sin leer (y los pedidos de Ella) aunque la app esté cerrada (~15 min).
+- **Permiso de internet del Apps Script (v22):** la IA usa `UrlFetchApp`, que necesita un permiso que solo da el dueño:
+  en script.google.com, elegir la función `autorizarIA` → ▶ Ejecutar → aceptar (una vez). clasp no puede darlo.
+  `?action=health` devuelve `iaPermiso` y "Actualizar Apps Script" deja un aviso si es `false`. **Si agregas otro servicio
+  de Google al backend (Gmail, Calendar…), Jaider tendrá que volver a autorizar de la misma forma.**
 - **IA por el servidor (backend v19, apps 8.5.17+)**: las claves de Groq ya NO salen del Apps Script. Las apps mandan
   la consulta con la acción `ai` (`{code, app?, req}` o, en la libre con Pro, `{pro, device, req}`) y el script llama a Groq
   rotando las claves (la que da 429/401/403 descansa en CacheService). Límite: 150 llamadas por persona por hora.
