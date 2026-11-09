@@ -1,5 +1,5 @@
 // ============================================================================
-// BACKEND MI PROGRESO v18 — Google Apps Script (respaldo en Drive + app de Ella)
+// BACKEND MI PROGRESO v19 — Google Apps Script (respaldo en Drive + app de Ella)
 // ============================================================================
 // NOVEDAD v12 — DATOS POR USUARIO:
 //   La app de Ella (8.4.13+) manda app:'ella' en cada llamada. Con eso el backend sabe
@@ -14,6 +14,11 @@
 // ============================================================================
 // Carpeta "Mi Progreso v8.0":
 // https://drive.google.com/drive/folders/1hUkPHwACKs533vFBA0_D4VymitggIXKD
+//
+// v19: las claves de IA ya NO salen del servidor. Las apps (8.5.17+) le piden la respuesta a la IA con la
+//      acción "ai" y este script llama a Groq con tus claves (rota entre ellas si una se agota). verify_code y
+//      pro_verify ya no devuelven las claves (solo cuántas hay). Si alguna vez necesitas que las apps viejas
+//      las reciban otra vez, crea la propiedad CLAVES_IA_EN_APP = 1 (no recomendado).
 //
 // v18: fotos y videos en el chat (normales o "ver una vez"). Los archivos van a una carpeta PRIVADA en la raíz
 //      de tu Drive ("Mi Progreso - Chat (privado)"), no en la carpeta compartida. Los de "ver una vez" solo los
@@ -49,7 +54,8 @@
 // 4. Debe seguir con: Ejecutar como "Yo" · Quién tiene acceso "Cualquier persona".
 //
 // ACCIONES (POST con cuerpo JSON, o GET con ?action=...):
-//   verify_code    { code }                       -> { ok, role, groqKey, groqKeys:[...] }
+//   verify_code    { code }                       -> { ok, role, aiProxy:true, aiKeys:n }  (v19: sin claves)
+//   ai             { code|pro+device, app?, req }  -> { ok, status, body, retryAfter }  (la IA a través del servidor)
 //   sync_her_data  { code, payload }              -> guarda progreso_ella.json        (Ella o admin)
 //   get_messages   { code, includeRead? }         -> mensajes pendientes / todos       (Ella o admin)
 //   mark_read      { code, ids:[...] }            -> marca mensajes como leídos        (Ella o admin)
@@ -82,7 +88,7 @@
 //   pro_list       { code }                       -> códigos Pro y su estado            (solo admin)
 //   pro_update     { code, id, days?, revoke?, release? } -> alarga / revoca / reactiva / libera el teléfono (solo admin)
 //   pro_delete     { code, id }                   -> borra el código (la carpeta queda)  (solo admin)
-//   pro_verify     { pro, device }                -> { ok, name, expiresAt, groqKeys }  (app libre; amarra el teléfono)
+//   pro_verify     { pro, device }                -> { ok, name, expiresAt, aiProxy:true }  (app libre; amarra el teléfono)
 //   pro_sync       { pro, device, payload }       -> copia en su carpeta                (app libre)
 //   pro_get        { pro, device }                -> su última copia                    (app libre)
 //   backup / sin action -> respaldo clásico (igual que antes)
@@ -103,7 +109,7 @@ function prop_(k, respaldo) {
 const CODIGO_ELLA  = prop_('CODIGO_ELLA',  "TU_CODIGO_SECRETO_AQUI");
 const CODIGO_ADMIN = prop_('CODIGO_ADMIN', "TU_CODIGO_ADMIN");
 const GROQ_API_KEY = prop_('GROQ_API_KEY', "TU_API_KEY_DE_GROQ");
-const BACKEND_VERSION = 'v18';
+const BACKEND_VERSION = 'v19';
 // Todas las claves de Groq configuradas, sin repetir y en orden (la principal primero).
 function groqKeys_() {
   const out = [];
@@ -118,6 +124,62 @@ function groqKeys_() {
   add(prop_('GROQ_API_KEYS', ''));
   return out;
 }
+// v19: solo si la propiedad CLAVES_IA_EN_APP = 1 se le entregan las claves a las apps (modo viejo).
+function clavesEnApp_() { return prop_('CLAVES_IA_EN_APP', '') === '1'; }
+function infoClaves_() {
+  const keys = groqKeys_(), o = { aiProxy: true, aiKeys: keys.length };
+  if (clavesEnApp_()) { o.groqKey = keys[0] || ''; o.groqKeys = keys; }
+  return o;
+}
+
+// ---------- IA a través del servidor (v19) ----------
+const AI_URL_GROQ = 'https://api.groq.com/openai/v1/chat/completions';
+const AI_MAX_BYTES = 12 * 1024 * 1024;     // fotos de menús incluidas
+const AI_LIMITE_HORA = 150;                // llamadas por persona por hora
+function aiCoolKey_(k) { return 'aicool_' + Utilities.base64EncodeWebSafe(Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, k)).slice(0, 20); }
+function aiQuien_(body) {
+  const role = roleOf(body.code);
+  if (role) return role + ':' + userOf(body, role);
+  if (body.pro) return 'pro:' + requirePro(body).x.id;
+  throw new Error('Código inválido o faltante');
+}
+function aiLimite_(quien) {
+  const c = CacheService.getScriptCache(), k = 'aicnt_' + quien.replace(/[^a-zA-Z0-9:_-]/g, '') + '_' + Math.floor(Date.now() / 3600000);
+  const n = Number(c.get(k) || 0) + 1;
+  c.put(k, String(n), 3700);
+  if (n > AI_LIMITE_HORA) throw new Error('Llegaste al límite de la IA por esta hora. Intenta más tarde.');
+}
+function aiValidar_(req) {
+  if (!req || typeof req !== 'object' || Array.isArray(req)) throw new Error('Falta la consulta para la IA');
+  if (typeof req.model !== 'string' || !Array.isArray(req.messages) || !req.messages.length) throw new Error('Consulta de IA inválida');
+  if (req.stream) throw new Error('La IA del servidor no admite stream');
+  const s = JSON.stringify(req);
+  if (s.length > AI_MAX_BYTES) throw new Error('La consulta para la IA es demasiado grande');
+  return s;
+}
+// Llama a Groq probando las claves en orden; la que responde 429/401/403 descansa un rato.
+function aiLlamar_(payload, keys, fetchFn) {
+  const cache = CacheService.getScriptCache();
+  const listas = [], descansando = [];
+  keys.forEach(function (k) { (cache.get(aiCoolKey_(k)) ? descansando : listas).push(k); });
+  const orden = listas.concat(descansando);
+  if (!orden.length) return { status: 503, body: JSON.stringify({ error: { message: 'No hay claves de IA configuradas en el servidor.' } }), retryAfter: 0 };
+  let last = null;
+  for (let i = 0; i < orden.length; i++) {
+    const k = orden[i];
+    const r = fetchFn(AI_URL_GROQ, {
+      method: 'post', contentType: 'application/json', muteHttpExceptions: true,
+      headers: { Authorization: 'Bearer ' + k }, payload: payload
+    });
+    const st = r.getResponseCode(), h = r.getHeaders() || {};
+    const ra = Number(h['retry-after'] || h['Retry-After'] || 0) || 0;
+    last = { status: st, body: r.getContentText(), retryAfter: ra };
+    if (st !== 429 && st !== 401 && st !== 403) return last;
+    cache.put(aiCoolKey_(k), '1', st === 429 ? Math.min(21600, Math.max(ra, 300)) : 21600);
+  }
+  return last;
+}
+
 function clavesConfiguradas_() {
   return CODIGO_ELLA !== "TU_CODIGO_SECRETO_AQUI" && CODIGO_ADMIN !== "TU_CODIGO_ADMIN";
 }
@@ -451,8 +513,16 @@ const ACTIONS = {
   verify_code: function (body) {
     const role = roleOf(body.code);
     if (!role) return { ok: false, error: 'Código inválido' };
-    const keys = groqKeys_();
-    return { ok: true, role: role, user: userOf(body, role), groqKey: keys[0] || GROQ_API_KEY, groqKeys: keys };
+    return Object.assign({ ok: true, role: role, user: userOf(body, role) }, infoClaves_());
+  },
+
+  // v19: la app manda la consulta y el servidor la hace con sus claves (nunca salen de aquí).
+  ai: function (body) {
+    const quien = aiQuien_(body);
+    const payload = aiValidar_(body.req);
+    aiLimite_(quien);
+    const r = aiLlamar_(payload, groqKeys_(), function (u, o) { return UrlFetchApp.fetch(u, o); });
+    return { ok: true, status: r.status, body: r.body, retryAfter: r.retryAfter || 0 };
   },
 
   sync_her_data: function (body, folder) {
@@ -935,7 +1005,7 @@ const ACTIONS = {
       if (taken) throw new Error('Este código Pro ya está en uso en otro teléfono');
     }
     proTouch(x.id, { lastUse: Date.now() });
-    return { ok: true, name: x.name, expiresAt: x.expiresAt, groqKeys: groqKeys_() };
+    return Object.assign({ ok: true, name: x.name, expiresAt: x.expiresAt }, infoClaves_());
   },
 
   pro_sync: function (body) {
@@ -1086,7 +1156,7 @@ function probarConfiguracion() {
   Logger.log('progreso_prueba.json: ' + (findFile(folder, USUARIOS.prueba.file) ? 'sí' : 'aún no'));
   Logger.log('Pedidos de la app de Ella: ' + loadRequests(folder).length);
   Logger.log('Códigos configurados: ' + clavesConfiguradas_());
-  Logger.log('Claves de IA configuradas: ' + groqKeys_().length);
+  Logger.log('Claves de IA configuradas: ' + groqKeys_().length + (clavesEnApp_() ? ' (se entregan a las apps: CLAVES_IA_EN_APP=1)' : ' (se quedan en el servidor)'));
   Logger.log('Códigos Pro: ' + proLoad().length + ' (carpeta: ' + PRO_ROOT_NAME + ')');
   Logger.log('Mensajes en el chat: ' + (chatThread(loadChat(folder), 'ella').messages.length));
 }

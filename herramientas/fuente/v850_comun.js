@@ -1,4 +1,4 @@
-  /* ===================== v8.5.0 (+8.5.15 ventana flotante): chat, varias claves de IA, compartir la app libre y ventana flotante ===================== */
+  /* ===================== v8.5.0 (+8.5.15 ventana flotante, +8.5.17 IA por el servidor): chat, varias claves de IA, compartir la app libre y ventana flotante ===================== */
   // (Mismo bloque en las dos apps; MP_APK_IS_ELLA decide los textos y qué helper usa para hablar con el servidor.)
   const V85_ELLA=!!MP_APK_IS_ELLA;
   const V85_PUBLIC_URL='https://github.com/JaiderRico/APP_GYM/releases/download/publica/MiProgreso_Libre.apk';
@@ -88,51 +88,89 @@
   const V85_SRV='mp_ai_keys_srv_v1',V85_MAN='mp_ai_keys_v1',V85_COOL='mp_ai_cool_v1';
   const v85KeyProv=k=>/^gsk_/.test(k)?'groq':/^sk-ant-/.test(k)?'anthropic':/^sk-/.test(k)?'openai':'';
   const v85UrlProv=u=>/api\.groq\.com/.test(u)?'groq':/api\.openai\.com/.test(u)?'openai':/api\.anthropic\.com/.test(u)?'anthropic':'';
-  function v85List(k){const a=v85Ls.get(k,[]);return Array.isArray(a)?a.map(x=>String(x||'').trim()).filter(Boolean):[]}
+  // 8.5.17: las claves del servidor ya no llegan al teléfono. Con la app activada (código, o Pro en la libre) la IA
+  // va por el Apps Script (acción "ai"), que llama a Groq con sus claves. V85_SRVKEY es solo una marca, no una clave.
+  const V85_SRVKEY='gsk_servidor',V85_SRVN='mp_ai_srv_n';
+  function v85List(k){const a=v85Ls.get(k,[]);return Array.isArray(a)?a.map(x=>String(x||'').trim()).filter(x=>x&&x!==V85_SRVKEY):[]}
   function v85AllKeys(){const out=[];[...v85List(V85_SRV),...v85List(V85_MAN)].forEach(k=>{if(!out.includes(k))out.push(k)});return out}
   function v85Pool(prov,cur){
     const cool=v85Ls.get(V85_COOL,{}),now=Date.now(),seen=[],ok=[],wait=[];
-    [cur,...v85AllKeys()].forEach(k=>{if(!k||seen.includes(k)||v85KeyProv(k)!==prov)return;seen.push(k);((cool[k]||0)>now?wait:ok).push(k)});
+    [cur,...v85AllKeys()].forEach(k=>{if(!k||k===V85_SRVKEY||seen.includes(k)||v85KeyProv(k)!==prov)return;seen.push(k);((cool[k]||0)>now?wait:ok).push(k)});
     return ok.concat(wait.sort((a,b)=>(cool[a]||0)-(cool[b]||0)));
   }
   function v85MarkCool(k,ms){const c=v85Ls.get(V85_COOL,{}),now=Date.now();for(const x in c)if(c[x]<now)delete c[x];c[k]=now+ms;v85Ls.set(V85_COOL,c)}
+  // ¿Con qué se habla con el servidor? (la app libre pone window.__mpAiVia con su código Pro)
+  function v85Via(){
+    if(typeof window.__mpAiVia==='function'){try{return window.__mpAiVia()||null}catch{return null}}
+    const c=v85Code();return c?{code:c,...(V85_ELLA?{app:'ella'}:{})}:null;
+  }
+  const v85Resp=(status,obj,extra)=>new Response(typeof obj==='string'?obj:JSON.stringify(obj),{status,headers:{'content-type':'application/json',...(extra||{})}});
+  async function v85ProxyFetch(init){
+    const via=v85Via();
+    if(!via)return v85Resp(401,{error:{message:'La IA necesita que la app esté activada.'}});
+    let req;try{req=JSON.parse(init.body)}catch{return v85Resp(400,{error:{message:'Consulta inválida'}})}
+    const {url,...auth}=via,dest=url||v85Url();
+    const call=nxHttp('POST',dest,{'Content-Type':'text/plain;charset=utf-8'},JSON.stringify({action:'ai',...auth,req}));
+    const sig=init.signal;
+    const r=await (sig?Promise.race([call,new Promise((_,no)=>{const f=()=>no(new DOMException('Aborted','AbortError'));if(sig.aborted)f();else sig.addEventListener('abort',f,{once:true})})]):call);
+    if(r.status<0)return v85Resp(503,{error:{message:r.status===-2?'El servidor tardó demasiado.':'Sin conexión. Revisa tu internet.'}});
+    let j;try{j=JSON.parse(r.text)}catch{return v85Resp(502,{error:{message:'No se pudo conectar con el servidor.'}})}
+    if(!j.ok)return v85Resp(/c[oó]digo|venci|desactivado|otro tel/i.test(j.error||'')?403:/l[ií]mite/i.test(j.error||'')?429:502,{error:{message:j.error||'Error del servidor'}});
+    return v85Resp(Number(j.status)||502,String(j.body||''),j.retryAfter?{'retry-after':String(j.retryAfter)}:null);
+  }
   const v85Fetch=window.fetch.bind(window);
   window.fetch=async function(input,init){
     const url=typeof input==='string'?input:(input&&input.url)||'';
     const prov=v85UrlProv(url);
     if(!prov||!init||!init.headers||init.headers instanceof Headers)return v85Fetch(input,init);
     const h=init.headers,cur=prov==='anthropic'?String(h['x-api-key']||''):String(h.authorization||h.Authorization||'').replace(/^Bearer\s+/i,'');
-    let pool=v85Pool(prov,cur);
-    if(!pool.length)return v85Fetch(input,init);
-    let res=null;const tried=new Set();
-    for(let i=0;i<pool.length;i++){
-      const k=pool[i],hh={...h};tried.add(k);
+    const pool=v85Pool(prov,cur),srv=prov==='groq'&&(cur===V85_SRVKEY||!!v85Via());
+    // Con la marca del servidor: primero el servidor y luego las claves propias; con una clave propia: al revés.
+    const seq=!srv?pool:cur===V85_SRVKEY?['srv',...pool]:[...pool,'srv'];
+    if(!seq.length)return v85Fetch(input,init);
+    let res=null;
+    for(let i=0;i<seq.length;i++){
+      const k=seq[i];
+      if(k==='srv'){res=await v85ProxyFetch(init);if(res.status!==429&&res.status!==401&&res.status!==403&&res.status<500)return res;continue}
+      const hh={...h};
       if(prov==='anthropic')hh['x-api-key']=k;else{delete hh.Authorization;hh.authorization='Bearer '+k}
       res=await v85Fetch(input,{...init,headers:hh});
       if(res.status!==429&&res.status!==401&&res.status!==403){
-        if(k!==cur){try{const c=aiCfg();if(c.key===cur||!c.key){if(cur&&!v85AllKeys().includes(cur))v85Ls.set(V85_MAN,[...v85List(V85_MAN),cur]);aiSaveCfg({...c,key:k})}}catch{}
+        if(k!==cur&&cur!==V85_SRVKEY){try{const c=aiCfg();if(c.key===cur||!c.key){if(cur&&!v85AllKeys().includes(cur))v85Ls.set(V85_MAN,[...v85List(V85_MAN),cur]);aiSaveCfg({...c,key:k})}}catch{}
           try{toast('🔑 Una clave de IA se agotó: ya estoy usando la siguiente.')}catch{}}
         return res;
       }
       const ra=Number(res.headers?.get?.('retry-after'))||0;
       v85MarkCool(k,res.status===429?Math.max(ra*1000,5*60000):6*3600000);
-      // Se acabaron las claves que tenía el teléfono: traer las del servidor (quizá agregaste nuevas) y seguir con esas
-      if(i===pool.length-1&&prov==='groq'&&!init.__v85Synced&&Date.now()-(v85Ls.get('mp_ai_keys_force',0))>60000){
-        init.__v85Synced=true;v85Ls.set('mp_ai_keys_force',Date.now());
-        if(await v85SyncKeys(true)){const more=v85Pool(prov,'').filter(x=>!tried.has(x));pool=pool.concat(more)}
-      }
     }
     return res;
   };
+  // Si la app está activada y no hay clave propia, usa la IA del servidor.
+  const _v85AiSave=aiSaveCfg;
+  aiSaveCfg=function(c){try{if(c&&!c.key&&(c.provider||'groq')==='groq'&&v85Via())c={...c,provider:'groq',key:V85_SRVKEY}}catch{}return _v85AiSave(c)};
+  // En la ventana ✦ no se muestra la marca: se explica que la IA va por el servidor.
+  function v85AiModalFix(){try{const k=$('#aiKey');if(!k||k.value!==V85_SRVKEY)return;k.value='';k.placeholder='Pega una clave solo si quieres usar una tuya';const st=$('#aiStatus');if(st)st.textContent='🔒 Usando la IA del servidor: las claves no se guardan en este teléfono.'}catch{}}
+  try{const m=$('#aiModal');if(m)new MutationObserver(()=>{if(!m.classList.contains('hidden'))v85AiModalFix()}).observe(m,{attributes:true,attributeFilter:['class']})}catch{}
+  function v85EnsureSrv(){try{const c=aiCfg();if(!c.key&&(c.provider||'groq')==='groq'&&v85Via())aiSaveCfg(c)}catch{}}
+  // Las versiones anteriores guardaban las claves del servidor en el teléfono: se borran.
+  (function v85ForgetKeys(){try{
+    const old=v85List(V85_SRV);if(!old.length)return;
+    const c=aiCfg();if(c.key&&old.includes(c.key))_v85AiSave({...c,provider:'groq',key:V85_SRVKEY});
+    v85Ls.set(V85_MAN,v85List(V85_MAN).filter(k=>!old.includes(k)));
+    const cool=v85Ls.get(V85_COOL,{});old.forEach(k=>delete cool[k]);v85Ls.set(V85_COOL,cool);
+    v85Ls.set(V85_SRV,[]);
+  }catch{}})();
   async function v85SyncKeys(force){
     if(!v85Code())return false;
     const last=v85Ls.get('mp_ai_keys_sync',0);if(!force&&Date.now()-last<3*3600000)return false;
     try{
       const j=await v85Gas('verify_code');v85Ls.set('mp_ai_keys_sync',Date.now());
-      if(Array.isArray(j.groqKeys)){
+      if(typeof j.aiKeys==='number')v85Ls.set(V85_SRVN,j.aiKeys);
+      // Solo si en el servidor activaron CLAVES_IA_EN_APP=1 (modo viejo) llegan las claves
+      if(Array.isArray(j.groqKeys)&&j.groqKeys.length){
         const ks=j.groqKeys.filter(k=>/^gsk_/.test(k));v85Ls.set(V85_SRV,ks);
-        const c=aiCfg();if(ks.length&&(c.provider||'groq')==='groq'&&!(c.key&&v85AllKeys().includes(c.key)))aiSaveCfg({...c,provider:'groq',key:ks[0]});
-      }
+        const c=aiCfg();if(ks.length&&(c.provider||'groq')==='groq'&&!(c.key&&c.key!==V85_SRVKEY&&v85AllKeys().includes(c.key)))aiSaveCfg({...c,provider:'groq',key:ks[0]});
+      }else{v85Ls.set(V85_SRV,[]);v85EnsureSrv()}
       return true;
     }catch(e){return false}
   }
@@ -140,8 +178,8 @@
   function v85KeysHtml(){
     const srv=v85List(V85_SRV),man=v85List(V85_MAN),cur=(()=>{try{return aiCfg().key||''}catch{return ''}})(),cool=v85Ls.get(V85_COOL,{}),now=Date.now();
     const row=k=>`<li><code>${esc(v85Mask(k))}</code>${k===cur?' · <b>en uso</b>':''}${(cool[k]||0)>now?' · ⏳ descansando':''}</li>`;
-    return `<p class="small" style="margin-top:0">Cuando una clave llega a su límite, la app pasa sola a la siguiente y vuelve a la primera cuando se recupera.</p>
-      <p class="small" style="margin:6px 0 2px"><b>Del servidor (${srv.length}):</b></p>${srv.length?`<ul class="small" style="margin:0 0 8px;padding-left:18px">${srv.map(row).join('')}</ul>`:'<p class="small" style="margin:0 0 8px">Ninguna todavía.</p>'}
+    return `<p class="small" style="margin-top:0">Cuando una clave llega a su límite, la app pasa sola a la siguiente y vuelve a la primera cuando se recupera. Las del servidor nunca se guardan en el teléfono.</p>
+      <p class="small" style="margin:6px 0 2px"><b>🔒 Del servidor${v85Ls.get(V85_SRVN,null)!=null?` (${v85Ls.get(V85_SRVN,0)})`:''}:</b> ${v85Via()?`se quedan guardadas en el servidor; el teléfono nunca las recibe. La IA pasa por ahí${cur===V85_SRVKEY?' · <b>en uso</b>':''}.`:'activa la app para usarlas.'}</p>${srv.length?`<ul class="small" style="margin:0 0 8px;padding-left:18px">${srv.map(row).join('')}</ul>`:''}
       ${V85_ELLA?'':'<p class="small" style="margin:0 0 8px">Se configuran en el Apps Script → Propiedades del script: <code>GROQ_API_KEY</code>, <code>GROQ_API_KEY_2</code>, <code>GROQ_API_KEY_3</code>…</p>'}
       <label class="small"><b>Claves extra solo en este teléfono</b> (una por línea, opcional):</label>
       <textarea id="v85KeysMan" placeholder="gsk_…" autocomplete="off" spellcheck="false">${esc(man.join('\n'))}</textarea>
@@ -490,7 +528,7 @@
       const box=$('#settingsContent');if(!box)return r;
       box.insertAdjacentHTML('afterbegin',v85ShareHtml());
       const pip=v85Pip.ok?`<details class="settings-group" id="v85PipSet"><summary>⧉ Ventana flotante</summary><div class="settings-section" id="v85PipBody">${v85PipSetHtml()}</div></details>`:'';
-      const keys=`<details class="settings-group v85-keys" id="v85KeysSet"><summary>🔑 Claves de IA (${v85Pool('groq',(()=>{try{return aiCfg().key||''}catch{return ''}})()).length||0})</summary><div class="settings-section" id="v85KeysBody">${v85KeysHtml()}</div></details>`;
+      const keys=`<details class="settings-group v85-keys" id="v85KeysSet"><summary>🔑 Claves de IA (${v85Pool('groq',(()=>{try{return aiCfg().key||''}catch{return ''}})()).length+(v85Via()?1:0)}${v85Via()?' · 🔒 servidor':''})</summary><div class="settings-section" id="v85KeysBody">${v85KeysHtml()}</div></details>`;
       const chat=v85Code()?`<details class="settings-group"><summary>💬 Chat con ${esc(v85Other())}</summary><div class="settings-section"><p class="small" style="margin-top:0">Escríbanse desde la app. Te aviso con una notificación aunque esté cerrada (puede tardar unos minutos).</p><button class="secondary" data-v85-chat>Abrir chat</button></div></details>`:'';
       const pro=(!V85_ELLA&&v85Code())?`<details class="settings-group" id="v85ProSet"><summary>✦ Códigos Pro (app libre)</summary><div class="settings-section" id="v85ProBody">${v85ProHtml()}</div></details>`:'';
       box.insertAdjacentHTML('beforeend',chat+pro+pip+keys);
@@ -539,7 +577,8 @@
     return _rna850(a);
   };
 
-  setTimeout(()=>{v85EnsureBtn();v85BgPoll();v85SyncKeys(false);v85CheckRequests()},2500);
+  setTimeout(()=>{v85EnsureBtn();v85BgPoll();v85EnsureSrv();v85SyncKeys(false);v85CheckRequests()},2500);
+  setInterval(v85EnsureSrv,4000);
   setInterval(()=>{v85EnsureBtn();v85BgPoll()},45000);
   setInterval(v85CheckRequests,5*60000);
   setInterval(v85PipWatch,1500);

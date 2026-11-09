@@ -15,7 +15,7 @@
   del último Release y podrían bajar la libre.
 - Toda la interfaz y la lógica están en `assets/index.html` dentro de cada APK.
 - No hay proyecto de Android Studio: se edita la APK publicada más reciente y se vuelve a firmar.
-- `fuente/MiProgreso_Backend.gs` (v15): el backend (Google Apps Script). Las claves NO están en el código: viven en las Propiedades del script (CODIGO_ELLA, CODIGO_ADMIN, GROQ_API_KEY).
+- `fuente/MiProgreso_Backend.gs` (v19): el backend (Google Apps Script). Las claves NO están en el código: viven en las Propiedades del script (CODIGO_ELLA, CODIGO_ADMIN, GROQ_API_KEY).
   Al hacer push de un cambio a este archivo, el workflow **Actualizar Apps Script** lo sube con clasp, actualiza la misma implementación (la URL no cambia) y comprueba `?action=health`.
 - `fuente/MsgPoll.java`: código nativo que hace las notificaciones con la app cerrada (ya está dentro de las APK como classes6.dex, y `Reminders.onReceive` lo llama).
 - `fuente/Pip.java` (8.5.10, en classes7.dex): ventana flotante. La página usa `NativeStore.savePhoto('__pip__', 'supported'|'enter:9:16'|'auto:1'|'auto:0'|'active')`
@@ -36,6 +36,12 @@
 - `fuente/v850_comun.js`: el bloque 8.5.10 que va en las dos apps (antes de `initV7();`): chat, varias claves de IA,
   compartir la app libre, ventana flotante y (Jaider) aviso de pedidos de Ella. Si lo cambias, vuelve a pegarlo en los
   dos `index.html` reemplazando el bloque anterior.
+- `fuente/v870_ella_comidas.js` (8.5.17, **solo app de Ella**): registrar comidas es obligatorio (la pestaña Comida
+  siempre está, el cuestionario ya no lo pregunta) y 3 snacks al día altos en calorías y poco saciantes (le cuesta comer):
+  tarjeta arriba en Comida con ideas y botón "+ Lo comí" (se guarda como comida tipo `snack` con kcal/proteína), aviso en
+  Resumen si va atrasada, notificaciones `h87_snack1..3` (horas en `reminders.snack1..3`, apagado con `reminders.snacks`),
+  aviso de una sola vez (`settings.h87.seen`) y contexto para la IA de comidas/coach. Va en `trabajo/ella/assets/index.html`
+  justo antes de `initV7();` (después de v860). Si lo cambias, pégalo de nuevo ahí.
 - `fuente/v860_registros.js` (8.5.16): pesos raros. Va en los dos `index.html` justo después del bloque v8.5.0 (antes de
   `initV7();`); la libre lo hereda de la de Jaider. Al terminar una serie, si el peso no cuadra con las últimas sesiones del mismo
   ejercicio (kg totales; lb→kg, "por lado"×2; placas aparte) pregunta con `confirm`; confirmado queda `st.loadOk=true` (también
@@ -76,8 +82,17 @@
 - Chat (backend v15): `chat_send` / `chat_list` / `chat_read`, guardado en `chat_mi_progreso.json`. La app de Ella con su
   código usa el chat "ella"; con el código admin (prueba) usa "prueba". En la app de Jaider el botón 🧪 Prueba muestra ese.
   `pending_notifications` avisa los mensajes sin leer (y los pedidos de Ella) aunque la app esté cerrada (~15 min).
+- **IA por el servidor (backend v19, apps 8.5.17+)**: las claves de Groq ya NO salen del Apps Script. Las apps mandan
+  la consulta con la acción `ai` (`{code, app?, req}` o, en la libre con Pro, `{pro, device, req}`) y el script llama a Groq
+  rotando las claves (la que da 429/401/403 descansa en CacheService). Límite: 150 llamadas por persona por hora.
+  `verify_code` y `pro_verify` ya no devuelven `groqKeys` (solo `aiProxy:true` y `aiKeys`). En el teléfono, `aiCfg().key`
+  queda con la marca `gsk_servidor` (no es una clave) y el `window.fetch` de v850 desvía a `ai` las llamadas a api.groq.com.
+  Las claves propias que alguien pegue en el teléfono siguen funcionando (y son el respaldo si el servidor falla).
+  Al actualizar, las apps borran las claves del servidor que tenían guardadas. Solo si hiciera falta volver al modo viejo:
+  propiedad `CLAVES_IA_EN_APP = 1`. Recomendado: cambiar las claves de Groq una vez todos estén en 8.5.17 (las viejas
+  sí llegaron a los teléfonos). La app libre pone `window.__mpAiVia` (publica.js) para usar su código Pro.
 - Claves de IA (backend v15): `GROQ_API_KEY`, `GROQ_API_KEY_2`, `GROQ_API_KEY_3`… (hasta _9) o `GROQ_API_KEYS` (separadas
-  por comas) en Propiedades del script. `verify_code` devuelve `groqKeys`; las apps las traen cada 12 h (o con
+  por comas) en Propiedades del script. (hasta v18) `verify_code` devolvía `groqKeys`; las apps las traían cada 12 h (o con
   Ajustes → 🔑 Claves de IA → Traer del servidor) y si una responde 429/401/403 reintentan con la siguiente.
 - Códigos Pro (backend v16, app libre 8.5.11+): Jaider los crea en su app → Ajustes → ✦ Códigos Pro (nombre + días);
   se guardan en la propiedad del script `PRO_CODIGOS` (no en Drive, para que nadie más los vea) y vencen solos.

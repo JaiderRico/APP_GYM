@@ -1,0 +1,1 @@
+- Pro: la IA pasa por el servidor; las claves ya no se guardan en el teléfono

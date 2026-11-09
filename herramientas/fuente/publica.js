@@ -58,19 +58,21 @@
     if(!j.ok){const e=new Error(j.error||'Error del servidor');e.auth=/c[oó]digo pro|venci|desactivado|inv[aá]lido|otro tel/i.test(j.error||'');throw e}
     return j;
   }
-  function pubProKeys(keys){
-    keys=(keys||[]).filter(k=>/^gsk_/.test(k));
+  // 8.5.17: con Pro la IA va por el servidor (las claves no llegan al teléfono). j = respuesta de pro_verify, o null al salir de Pro.
+  window.__mpAiVia=()=>pubProOn()?{url:PUB_PRO_URL,pro:pubProSt().code,device:pubDevice()}:null;
+  function pubProKeys(j){
+    const keys=((j&&j.groqKeys)||[]).filter(k=>/^gsk_/.test(k));
     try{localStorage.setItem('mp_ai_keys_srv_v1',JSON.stringify(keys))}catch{}
-    const c=aiCfg();aiSaveCfg({...c,provider:'groq',model:c.provider==='groq'?(c.model||''):'',key:keys[0]||''});
+    const c=aiCfg();aiSaveCfg({...c,provider:'groq',model:c.provider==='groq'?(c.model||''):'',key:j?(keys[0]||'gsk_servidor'):''});
   }
   function pubProOff(msg){
-    const had=!!pubProSt().code;pubProSave({});pubProKeys([]);
+    const had=!!pubProSt().code;pubProSave({});pubProKeys(null);
     if(had&&msg)toast(msg);pubHome();try{if(!$('#settingsModal')?.classList.contains('hidden'))renderSettings()}catch{}
   }
   async function pubProActivate(code,{quiet=false}={}){
     code=String(code||'').trim().toUpperCase();if(!code)throw new Error('Escribe tu código.');
     const j=await pubProCall('pro_verify',{},code);
-    const prev=pubProSt();pubProSave({...(prev.code===code?prev:{}),code,name:j.name,expiresAt:j.expiresAt,verifiedAt:Date.now()});pubProKeys(j.groqKeys);
+    const prev=pubProSt();pubProSave({...(prev.code===code?prev:{}),code,name:j.name,expiresAt:j.expiresAt,verifiedAt:Date.now()});pubProKeys(j);
     if(!quiet){toast('✦ ¡Pro activado!');pubHome();await pubProOfferRestore()}
     return j;
   }

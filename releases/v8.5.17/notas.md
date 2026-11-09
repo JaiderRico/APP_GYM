@@ -1,0 +1,2 @@
+- La IA ahora pasa por el servidor: las claves ya no se guardan en el teléfono (se borran las copias viejas)
+- App de Ella: registrar comidas es parte del plan y 3 snacks al día altos en calorías que no llenan, con recordatorios e ideas
