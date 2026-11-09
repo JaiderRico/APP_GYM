@@ -1,0 +1,2 @@
+- ◀ El gesto/botón de volver cierra las ventanas y vuelve al inicio antes de salir de la app
+- 🆕 Novedades de cada versión en Ajustes

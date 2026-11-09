@@ -1,4 +1,4 @@
-  /* ===================== v8.5.0 (+8.5.15 ventana flotante, +8.5.17 IA por el servidor): chat, varias claves de IA, compartir la app libre y ventana flotante ===================== */
+  /* ===================== v8.5.0 (+8.5.15 ventana flotante, +8.5.17 IA por el servidor, +8.5.18 chat tipo WhatsApp): chat, varias claves de IA, compartir la app libre y ventana flotante ===================== */
   // (Mismo bloque en las dos apps; MP_APK_IS_ELLA decide los textos y qué helper usa para hablar con el servidor.)
   const V85_ELLA=!!MP_APK_IS_ELLA;
   const V85_PUBLIC_URL='https://github.com/JaiderRico/APP_GYM/releases/download/publica/MiProgreso_Libre.apk';
@@ -186,23 +186,69 @@
       <div class="row" style="gap:8px;margin-top:8px"><button class="primary" style="flex:1;margin:0" data-v85-keys-save>Guardar</button><button class="secondary" style="flex:1;margin:0" data-v85-keys-sync>↻ Traer del servidor</button></div>`;
   }
 
-  /* ---------- 2) Chat entre las dos apps ---------- */
-  const v85Chat={open:false,thread:'',msgs:[],readByOther:0,unread:0,timer:0,bgTimer:0,busy:false};
+  /* ---------- 2) Chat entre las dos apps (8.5.18: estilo WhatsApp, más rápido) ---------- */
+  // Envío instantáneo (cola en el teléfono), ✓ enviado · ✓✓ recibido · ✓✓ azul leído, "en línea"/"escribiendo…",
+  // responder deslizando el mensaje a la derecha o manteniéndolo presionado, y consulta liviana (rev) cada 2,5 s.
+  document.head.insertAdjacentHTML('beforeend',`<style id="v858css">
+    .v85-chat{background:var(--bg)}
+    .v85-ch-head{gap:8px;padding:calc(env(safe-area-inset-top,0px) + 8px) 10px 8px}
+    .v85-ch-head .bk{margin:0;min-width:0;width:40px;height:40px;padding:0;border-radius:50%;font-size:22px;line-height:1;background:transparent;border:0;color:var(--text)}
+    .v85-ava{width:40px;height:40px;flex:none;border-radius:50%;display:grid;place-items:center;font-weight:900;font-size:18px;background:var(--green);color:#0b120d}
+    .v85-who{flex:1;min-width:0}.v85-who b{display:block;font-size:17px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    .v85-who span{display:block;font-size:12.5px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.v85-who span.on{color:var(--green)}
+    .v85-act{display:none;gap:4px}.v85-chat.sel .v85-act{display:flex}.v85-chat.sel .v85-who,.v85-chat.sel .v85-ava{display:none}
+    .v85-chat.sel .v85-act{flex:1;justify-content:flex-end}.v85-act button{margin:0;padding:8px 12px;border-radius:12px}
+    .v85-ch-list{gap:2px;padding:10px 10px 14px;background-color:var(--bg);background-image:radial-gradient(rgba(128,128,128,.10) 1px,transparent 1.2px);background-size:16px 16px;overscroll-behavior:contain}
+    .v85-day{position:sticky;top:0;z-index:2;align-self:center;font-size:11.5px;font-weight:700;color:var(--text);background:var(--panel);border:1px solid var(--line);padding:4px 10px;border-radius:9px;margin:10px 0 6px;box-shadow:0 1px 2px #0002}
+    .v85-new{align-self:stretch;text-align:center;font-size:12px;font-weight:700;color:var(--text);background:var(--panel2);border-radius:8px;padding:5px;margin:8px 0}
+    .v85-row{display:flex;flex-direction:column;align-items:flex-start;margin-top:6px;touch-action:pan-y;transition:transform .15s}
+    .v85-row.me{align-items:flex-end}.v85-row.cont{margin-top:2px}
+    .v85-row .sw{position:absolute;left:-30px;top:50%;transform:translateY(-50%);opacity:0;font-size:18px}
+    .v85-b{position:relative;max-width:82%;padding:6px 8px 5px 9px;border-radius:12px;font-size:15.5px;line-height:1.33;white-space:pre-wrap;word-wrap:break-word;overflow-wrap:anywhere;background:var(--panel);color:var(--text);border:1px solid var(--line);box-shadow:0 1px 1px #0002;-webkit-user-select:none;user-select:none}
+    .v85-row.me .v85-b{background:var(--green);color:#0b120d;border-color:transparent}
+    .v85-row:not(.cont) .v85-b{border-top-left-radius:3px}.v85-row.me:not(.cont) .v85-b{border-top-left-radius:12px;border-top-right-radius:3px}
+    .v85-row.selm .v85-b{outline:3px solid #4aa3ff99}
+    .v85-row.flash .v85-b{animation:v85fl 1.2s}@keyframes v85fl{30%{filter:brightness(1.35)}}
+    .v85-meta{float:right;display:inline-flex;align-items:center;gap:3px;margin:6px 0 -3px 10px;font-size:10.5px;opacity:.7;white-space:nowrap;line-height:1}
+    .v85-tk{display:inline-block;width:16px;height:11px}.v85-tk.rd{color:#1677ff;opacity:1}
+    .v85-b.big{background:transparent!important;border-color:transparent!important;box-shadow:none;font-size:40px;line-height:1.1;padding:0 2px}.v85-b.big .v85-meta{color:var(--muted)}
+    .v85-q{display:block;margin:-1px -3px 5px -4px;padding:5px 8px;border-radius:8px;border-left:4px solid #1677ff;background:rgba(0,0,0,.08);font-size:13px;line-height:1.3;cursor:pointer;max-height:62px;overflow:hidden}
+    .v85-row.me .v85-q{background:rgba(0,0,0,.12)}.v85-q b{display:block;font-size:12.5px;color:#1677ff}.v85-row.me .v85-q b{color:#0b4fb3}
+    .v85-b .v85-mbox,.v85-b .v85-once{margin:-3px -5px 4px -6px}
+    .v85-err{color:#ff5d5d;font-weight:800;text-decoration:underline;opacity:1}
+    .v85-ch-foot{align-items:flex-end;gap:6px;padding:6px 8px calc(env(safe-area-inset-bottom,0px) + 8px);border-top:0;background:transparent}
+    .v85-pill{flex:1;display:flex;align-items:flex-end;min-height:46px;border-radius:24px;background:var(--panel);border:1px solid var(--line);box-shadow:0 1px 2px #0002;padding:0 4px 0 6px}
+    .v85-pill textarea{flex:1;border:0!important;box-shadow:none!important;outline:none!important;-webkit-appearance:none;appearance:none;background:transparent!important;min-height:44px;max-height:130px;padding:12px 6px;border-radius:0;color:var(--text);font:inherit;font-size:16px;resize:none;outline:none}
+    .v85-pill .v85-att{margin:0 0 3px;min-width:0;width:40px;height:40px;padding:0;border:0;border-radius:50%;background:transparent!important;font-size:20px}
+    .v85-ch-foot .v85-go{margin:0;min-width:0;width:48px;height:48px;padding:0;border-radius:50%;font-size:20px;flex:none}
+    .v85-rep{display:flex;align-items:center;gap:8px;margin:0 8px;padding:7px 8px 7px 10px;border-radius:14px 14px 0 0;background:var(--panel);border:1px solid var(--line);border-bottom:0}
+    .v85-rep.hidden{display:none}.v85-rep div{flex:1;min-width:0;border-left:4px solid #1677ff;padding-left:8px}
+    .v85-rep b{display:block;font-size:12.5px;color:#1677ff}.v85-rep span{display:block;font-size:13px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    .v85-rep button{margin:0;min-width:0;width:32px;height:32px;padding:0;border-radius:50%}
+    .v85-down{position:absolute;right:14px;bottom:86px;z-index:3;width:42px;height:42px;border-radius:50%;margin:0;padding:0;min-width:0;display:grid;place-items:center;font-size:20px;background:var(--panel);color:var(--text);border:1px solid var(--line);box-shadow:0 2px 6px #0004}
+    .v85-down.hidden{display:none}.v85-down i{position:absolute;top:-6px;right:-4px;min-width:18px;height:18px;padding:0 4px;border-radius:9px;background:var(--green);color:#0b120d;font:800 11px/18px sans-serif;font-style:normal}
+    .v85-typing{display:inline-flex;gap:3px;align-items:center;padding:10px 12px;border-radius:12px;border-top-left-radius:3px;background:var(--panel);border:1px solid var(--line);margin-top:6px;align-self:flex-start}
+    .v85-typing i{width:7px;height:7px;border-radius:50%;background:var(--muted);animation:v85ty 1.2s infinite}.v85-typing i:nth-child(2){animation-delay:.2s}.v85-typing i:nth-child(3){animation-delay:.4s}
+    @keyframes v85ty{30%{transform:translateY(-4px);opacity:1}0%,60%,100%{opacity:.4}}
+  </style>`);
+  const v85Chat={open:false,thread:'',msgs:[],readByOther:0,unread:0,timer:0,bgTimer:0,busy:false,rev:'',other:{},reply:null,sel:null,newFrom:0,below:0};
   const v85ThreadKey=()=>V85_ELLA?'':(v85Chat.thread==='prueba'?'prueba':'');
   const v85CacheKey=()=>'mp_chat_v1_'+(v85ThreadKey()||'main');
   const v85OutKey='mp_chat_out_v1';
-  function v85LoadCache(){const c=v85Ls.get(v85CacheKey(),{msgs:[],readByOther:0});v85Chat.msgs=Array.isArray(c.msgs)?c.msgs:[];v85Chat.readByOther=Number(c.readByOther)||0}
+  const v85Tk=()=>{const tk=v85ThreadKey();return tk?{thread:tk}:{}};
+  function v85LoadCache(){const c=v85Ls.get(v85CacheKey(),{msgs:[],readByOther:0});v85Chat.msgs=Array.isArray(c.msgs)?c.msgs:[];v85Chat.readByOther=Number(c.readByOther)||0;v85Chat.rev=String(c.rev||'');v85Chat.other={got:Number(c.got)||0}}
   function v85SaveCache(){
     const L=v85Chat.msgs.slice(-300),keep=L.length-60;
-    v85Ls.set(v85CacheKey(),{msgs:L.map((m,i)=>i<keep&&m.media&&m.media.thumb?{...m,media:{...m.media,thumb:''}}:m),readByOther:v85Chat.readByOther});
+    v85Ls.set(v85CacheKey(),{msgs:L.map((m,i)=>i<keep&&m.media&&m.media.thumb?{...m,media:{...m.media,thumb:''}}:m),readByOther:v85Chat.readByOther,rev:v85Chat.rev,got:v85Chat.other.got||0});
   }
   function v85Out(){const o=v85Ls.get(v85OutKey,[]);return Array.isArray(o)?o:[]}
   const v85Me=()=>V85_ELLA?'ella':'jaider';
+  const v85LastTs=()=>v85Chat.msgs.length?v85Chat.msgs[v85Chat.msgs.length-1].ts:0;
   function v85Merge(list){
     const byId=new Map(v85Chat.msgs.map(m=>[m.id,m]));let added=0;
     (list||[]).forEach(m=>{if(!m||!m.id)return;if(!byId.has(m.id))added++;const old=byId.get(m.id);
       const media=m.media?{...(old&&old.media||{}),...m.media,...(old&&old.media&&old.media.opened&&!m.media.opened?{opened:old.media.opened}:{})}:undefined;
-      byId.set(m.id,{id:m.id,from:m.from,text:m.text||'',ts:Number(m.ts)||0,...(media?{media}:{})})});
+      byId.set(m.id,{id:m.id,from:m.from,text:m.text||'',ts:Number(m.ts)||0,...(media?{media}:{}),...(m.reply?{reply:m.reply}:{})})});
     v85Chat.msgs=[...byId.values()].sort((a,b)=>(a.ts||0)-(b.ts||0));return added;
   }
   function v85EnsureBtn(){
@@ -214,22 +260,58 @@
   function v85Badge(){const b=$('#v85ChatBtn');if(!b)return;b.querySelector('.v85-badge')?.remove();if(v85Chat.unread>0)b.insertAdjacentHTML('beforeend',`<span class="v85-badge">${v85Chat.unread>9?'9+':v85Chat.unread}</span>`)}
   function v85Time(ts){const d=new Date(ts);return d.toLocaleTimeString('es-CO',{hour:'numeric',minute:'2-digit'})}
   function v85DayLabel(ts){const d=new Date(ts),t=new Date();const k=x=>x.toDateString();if(k(d)===k(t))return 'Hoy';const y=new Date();y.setDate(y.getDate()-1);if(k(d)===k(y))return 'Ayer';return d.toLocaleDateString('es-CO',{weekday:'short',day:'numeric',month:'short'})}
+  const v85NameOf=from=>from===v85Me()?'Tú':v85Other();
+  const v85Snip=m=>m.media?(m.media.kind==='video'?'🎥 Video':'📷 Foto')+(m.text?' · '+m.text:''):m.text;
+  // ✓ / ✓✓ en SVG (se ven nítidos y el azul de "leído" se distingue)
+  const V85_TK1='<svg class="v85-tk" viewBox="0 0 16 11"><path d="M4.5 8.6 1.4 5.5l-1 1 4.1 4.1L12.4 2.7l-1-1z" fill="currentColor"/></svg>';
+  const V85_TK2=c=>`<svg class="v85-tk ${c}" viewBox="0 0 16 11"><path d="M11.1 1.7 4.5 8.3 1.4 5.2l-1 1 4.1 4.1 7.6-7.6zm3.5 0L8 8.3l-.9-.9-1 1 1.9 1.9 7.6-7.6z" fill="currentColor"/></svg>`;
+  const V85_CLOCK='<svg class="v85-tk" viewBox="0 0 16 16" style="width:12px;height:12px"><circle cx="8" cy="8" r="6.5" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M8 4.2V8l2.6 1.6" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>';
+  function v85Ticks(m){
+    if(m.sendErr)return `<a href="#" class="v85-err" data-v85-retry="${esc(m.id)}">⚠ Reintentar</a>`;
+    if(m.pending)return V85_CLOCK;
+    if(v85Chat.readByOther>=m.ts)return V85_TK2('rd');
+    if((v85Chat.other.got||0)>=m.ts)return V85_TK2('');
+    return V85_TK1;
+  }
+  const v85Big1=s=>s&&s.length<=12&&!/[\p{L}\p{N}]/u.test(s)&&/\p{Extended_Pictographic}/u.test(s);
+  function v85All(){
+    const me=v85Me(),tk=v85ThreadKey(),ids=new Set(v85Chat.msgs.map(m=>m.id));
+    const pend=v85Out().filter(o=>(o.thread||'')===tk&&!ids.has(o.id)).map(o=>({...o,from:me,pending:true,sendErr:o.err&&o.tries>2?o.err:''}));
+    const sending=(v85Chat.sending||[]).filter(x=>(x.thread||'')===tk&&!ids.has(x.id)).map(x=>({id:x.id,from:me,text:x.text,ts:x.ts,media:x.media,reply:x.reply,pending:true,sendErr:x.err}));
+    return [...v85Chat.msgs,...pend,...sending];
+  }
+  function v85Head(){
+    const s=$('#v85ChSub');if(!s)return;
+    const o=v85Chat.other||{},now=Date.now();let txt,on=false;
+    const test=V85_ELLA&&(()=>{try{return kvGet('app_user')==='prueba'}catch{return false}})();
+    if(o.typing){txt='escribiendo…';on=true}
+    else if(o.seen&&now-o.seen<20000){txt='en línea';on=true}
+    else if(o.seen){const d=v85DayLabel(o.seen);txt=`últ. vez ${d==='Hoy'?'hoy':d==='Ayer'?'ayer':'el '+d} a las ${v85Time(o.seen)}`}
+    else txt=test?'🧪 Modo prueba: chat aparte':v85Chat.thread==='prueba'?'🧪 Chat de prueba':'toca un mensaje y deslízalo para responder';
+    s.textContent=txt;s.classList.toggle('on',on);
+  }
   function v85Render(){
     const box=$('#v85ChList');if(!box)return;
-    const me=v85Me(),pend=v85Out().filter(o=>(o.thread||'')===v85ThreadKey());
-    const sending=(v85Chat.sending||[]).filter(x=>(x.thread||'')===v85ThreadKey()&&!v85Chat.msgs.some(m=>m.id===x.id)).map(x=>({id:x.id,from:me,text:x.text,ts:x.ts,media:x.media,pending:true,sendErr:x.err}));
-    const all=[...v85Chat.msgs,...pend.filter(p=>!v85Chat.msgs.some(m=>m.id===p.id)).map(p=>({...p,from:me,pending:true})),...sending];
+    const me=v85Me(),all=v85All();v85Head();
     if(!all.length){box.innerHTML=`<div class="v85-ch-empty"><div style="font-size:40px">💬</div><p>Aún no hay mensajes. Escríbele a ${esc(v85Other())} lo que quieras: dudas de la rutina, cambios para la app o cómo te fue.</p></div>`;return}
-    let h='',lastDay='';const lastMine=[...all].reverse().find(m=>m.from===me&&!m.pending);
-    all.forEach(m=>{const day=v85DayLabel(m.ts||Date.now());if(day!==lastDay){h+=`<div class="v85-day">${esc(day)}</div>`;lastDay=day}
-      const st=m.sendErr?`⚠️ No se envió · <a href="#" data-v85-retry="${esc(m.id)}" style="color:inherit;font-weight:800">Reintentar</a>`:m.pending?(m.media?'⏳ enviando… (puede tardar con videos)':'⏳ enviando'):esc(v85Time(m.ts));
-      h+=m.media?`<div class="v85-msg media${m.from===me?' me':''}${m.pending&&!m.sendErr?' pend':''}">${v85MediaHtml(m,me)}${m.text?`<div class="cap">${esc(m.text)}</div>`:''}<small>${st}</small></div>`
-        :`<div class="v85-msg${m.from===me?' me':''}${m.pending?' pend':''}">${esc(m.text)}<small>${st}</small></div>`;
-      if(lastMine&&m.id===lastMine.id&&v85Chat.readByOther>=lastMine.ts)h+='<div class="v85-seen">✓✓ Visto</div>'});
-    const atBottom=box.scrollHeight-box.scrollTop-box.clientHeight<80;
-    box.innerHTML=h;if(atBottom||v85Chat.forceScroll){box.scrollTop=box.scrollHeight;v85Chat.forceScroll=false}
-    v85AutoLoadImages();
+    let h='',lastDay='',prev=null;
+    all.forEach(m=>{
+      const ts=m.ts||Date.now(),day=v85DayLabel(ts);
+      if(day!==lastDay){h+=`<div class="v85-day">${esc(day)}</div>`;lastDay=day;prev=null}
+      if(v85Chat.newFrom&&m.from!==me&&m.ts===v85Chat.newFrom)h+=`<div class="v85-new">Mensajes sin leer</div>`;
+      const cont=prev&&prev.from===m.from&&ts-(prev.ts||ts)<5*60000,mine=m.from===me;
+      const q=m.reply?`<span class="v85-q" data-v85-goto="${esc(m.reply.id)}"><b>${esc(v85NameOf(m.reply.from))}</b>${esc(m.reply.text||'')}</span>`:'';
+      const meta=`<span class="v85-meta">${esc(v85Time(ts))}${mine?' '+v85Ticks(m):''}</span>`;
+      const big=!m.media&&!q&&v85Big1(m.text);
+      h+=`<div class="v85-row${mine?' me':''}${cont?' cont':''}${v85Chat.sel===m.id?' selm':''}" data-v85-mid="${esc(m.id)}"><div class="v85-b${big?' big':''}">${q}${m.media?v85MediaHtml(m,me):''}${m.text?esc(m.text):''}${meta}</div></div>`;
+      prev=m});
+    if(v85Chat.other.typing)h+='<div class="v85-typing"><i></i><i></i><i></i></div>';
+    const atBottom=box.scrollHeight-box.scrollTop-box.clientHeight<90;
+    box.innerHTML=h;
+    if(atBottom||v85Chat.forceScroll){box.scrollTop=box.scrollHeight;v85Chat.forceScroll=false;v85Chat.below=0}
+    v85DownBtn();v85AutoLoadImages();
   }
+  function v85DownBtn(){const b=$('#v85Down'),box=$('#v85ChList');if(!b||!box)return;const far=box.scrollHeight-box.scrollTop-box.clientHeight>240;if(!far)v85Chat.below=0;b.classList.toggle('hidden',!far);b.innerHTML='⌄'+(v85Chat.below?`<i>${v85Chat.below}</i>`:'')}
 
   /* ---------- 2b) Fotos y videos en el chat (normales o "ver una vez") ---------- */
   const V85_MAX_VIDEO=20*1024*1024,v85Full={},v85Loading={};
@@ -316,7 +398,8 @@
     const inp=$('#v85ChInput'),text=(inp?.value||'').trim().slice(0,1000);
     let prep;try{toast(vid?'Preparando el video…':'Preparando la foto…');prep=vid?await v85PrepVideo(file):await v85PrepImage(file)}catch(e){toast(e.message||'No se pudo preparar.');return}
     if(inp){inp.value='';inp.style.height=''}
-    const item={id:'m'+Date.now().toString(36)+Math.random().toString(36).slice(2,7),ts:Date.now(),text,thread:v85ThreadKey(),
+    const rp=v85Chat.reply;v85SetReply(null);
+    const item={id:'m'+Date.now().toString(36)+Math.random().toString(36).slice(2,7),ts:Date.now(),text,thread:v85ThreadKey(),...(rp?{reply:{id:rp.id,from:rp.from,text:v85Snip(rp).slice(0,120)}}:{}),
       media:{kind:prep.kind,once:!!once,thumb:once?'':prep.thumb,w:prep.w,h:prep.h,dur:prep.dur||0,size:Math.round(prep.dataUrl.length*0.75)},data:prep};
     v85Chat.sending=[...(v85Chat.sending||[]),item];v85Chat.forceScroll=true;v85Render();v85SendItem(item);
   }
@@ -324,7 +407,7 @@
     item.err='';v85Render();
     try{
       const p=item.data;
-      const j=await v85Big('chat_send',{id:item.id,text:item.text,...(item.thread?{thread:item.thread}:{}),media:{dataUrl:p.dataUrl,kind:p.kind,once:item.media.once,thumb:item.media.thumb,w:p.w,h:p.h,dur:p.dur}});
+      const j=await v85Big('chat_send',{id:item.id,text:item.text,...(item.thread?{thread:item.thread}:{}),...(item.reply?{reply:{id:item.reply.id}}:{}),media:{dataUrl:p.dataUrl,kind:p.kind,once:item.media.once,thumb:item.media.thumb,w:p.w,h:p.h,dur:p.dur}});
       if(p.kind==='image'&&!item.media.once)v85CacheImg(item.id,p.dataUrl);
       if((item.thread||'')===v85ThreadKey())v85Merge([j.message]);
       v85Chat.sending=(v85Chat.sending||[]).filter(x=>x!==item);v85SaveCache();v85Render();
@@ -333,40 +416,123 @@
   function v85OpenChat(thread){
     if(!v85Code()){toast(V85_ELLA?'Activa tu app primero.':'Primero escribe tu código de administrador.');return}
     v85Chat.thread=V85_ELLA?'':(thread==='prueba'?'prueba':'');v85LoadCache();
-    $('#v85Chat')?.remove();
+    $('#v85Chat')?.remove();v85Chat.reply=null;v85Chat.sel=null;v85Chat.below=0;
+    // Separador "Mensajes sin leer": antes de los últimos que no había visto
+    const theirs=v85Chat.msgs.filter(m=>m.from!==v85Me());v85Chat.newFrom=v85Chat.unread>0&&theirs.length>=v85Chat.unread?theirs[theirs.length-v85Chat.unread].ts:0;
     const th=V85_ELLA?'':`<div class="v85-th"><button class="secondary ${v85Chat.thread?'':'on'}" data-v85-th="">Con ${esc(v85Other())}</button><button class="secondary ${v85Chat.thread?'on':''}" data-v85-th="prueba">🧪 Prueba</button></div>`;
-    document.body.insertAdjacentHTML('beforeend',`<div class="v85-chat" id="v85Chat" role="dialog" aria-modal="true"><div class="v85-ch-head"><h2>💬 ${esc(v85Other())}<span class="small" id="v85ChSub">${V85_ELLA&&(()=>{try{return kvGet('app_user')==='prueba'}catch{return false}})()?'🧪 Modo prueba: chat aparte':'Los mensajes llegan aunque la app esté cerrada'}</span></h2><button class="secondary" data-v85-close>Cerrar</button></div>${th}<div class="v85-ch-list" id="v85ChList"></div><div class="v85-sheet hidden" id="v85Sheet"><button class="secondary" data-v85-pick="image">📷 Foto</button><button class="secondary" data-v85-pick="video">🎥 Video</button><button class="secondary" data-v85-pick="image" data-once="1">👁 Foto · ver una vez</button><button class="secondary" data-v85-pick="video" data-once="1">👁 Video · ver una vez</button></div><input type="file" id="v85File" hidden><div class="v85-ch-foot"><button class="secondary v85-att" data-v85-attach aria-label="Adjuntar foto o video">📎</button><textarea id="v85ChInput" rows="1" maxlength="1000" placeholder="Escribe un mensaje…"></textarea><button class="primary" data-v85-send aria-label="Enviar">➤</button></div></div>`);
+    const ini=(v85Other()||'?').trim().charAt(0).toUpperCase();
+    document.body.insertAdjacentHTML('beforeend',`<div class="v85-chat" id="v85Chat" role="dialog" aria-modal="true">
+      <div class="v85-ch-head"><button class="bk" data-v85-close aria-label="Volver">‹</button><div class="v85-ava">${esc(ini)}</div><div class="v85-who"><b>${esc(v85Other())}</b><span id="v85ChSub"></span></div>
+        <div class="v85-act"><button class="secondary" data-v85-sel-reply>↩ Responder</button><button class="secondary" data-v85-sel-copy>📋 Copiar</button><button class="secondary" data-v85-sel-x aria-label="Quitar selección">✕</button></div></div>
+      ${th}<div class="v85-ch-list" id="v85ChList"></div><button class="v85-down hidden" id="v85Down" data-v85-down aria-label="Ir al último mensaje">⌄</button>
+      <div class="v85-sheet hidden" id="v85Sheet"><button class="secondary" data-v85-pick="image">📷 Foto</button><button class="secondary" data-v85-pick="video">🎥 Video</button><button class="secondary" data-v85-pick="image" data-once="1">👁 Foto · ver una vez</button><button class="secondary" data-v85-pick="video" data-once="1">👁 Video · ver una vez</button></div><input type="file" id="v85File" hidden>
+      <div class="v85-rep hidden" id="v85Rep"></div>
+      <div class="v85-ch-foot"><div class="v85-pill"><textarea id="v85ChInput" rows="1" maxlength="1000" placeholder="Mensaje"></textarea><button class="secondary v85-att" data-v85-attach aria-label="Adjuntar foto o video">📎</button></div><button class="primary v85-go" data-v85-send aria-label="Enviar">➤</button></div></div>`);
     v85Chat.open=true;v85Chat.forceScroll=true;v85Render();v85Refresh(true);
-    clearInterval(v85Chat.timer);v85Chat.timer=setInterval(()=>{if(!document.hidden)v85Refresh(false)},5000);
+    $('#v85ChList').addEventListener('scroll',v85DownBtn,{passive:true});
+    clearInterval(v85Chat.timer);v85Chat.timer=setInterval(()=>{if(!document.hidden)v85Refresh(false)},2500);
   }
-  function v85CloseChat(){v85Chat.open=false;clearInterval(v85Chat.timer);$('#v85Chat')?.remove();v85Chat.thread='';v85LoadCache()}
-  async function v85FlushOut(){
-    const out=v85Out();if(!out.length)return;
-    const keep=[];
-    for(const o of out){try{const j=await v85Gas('chat_send',{id:o.id,text:o.text,...(o.thread?{thread:o.thread}:{})});if((o.thread||'')===v85ThreadKey())v85Merge([j.message])}catch(e){if(e.auth)continue;keep.push(o)}}
-    v85Ls.set(v85OutKey,keep);
+  function v85CloseChat(){v85Chat.open=false;clearInterval(v85Chat.timer);$('#v85Chat')?.remove();v85Chat.thread='';v85Chat.reply=null;v85Chat.sel=null;v85Chat.newFrom=0;v85LoadCache()}
+  function v85Pres(j){
+    if(!j)return;const o=v85Chat.other;
+    if('otherSeen' in j)o.seen=Number(j.otherSeen)||0;
+    if('otherTyping' in j)o.typing=!!j.otherTyping;
+    if(j.otherGot)o.got=Math.max(o.got||0,Number(j.otherGot)||0);
   }
+  // Cola de envío: el mensaje aparece al instante con 🕓 y se manda en orden; si no hay internet queda guardado.
+  async function v85Pump(){
+    if(v85Chat.pumping)return;v85Chat.pumping=true;
+    try{
+      for(;;){
+        const out=v85Out(),o=out[0];if(!o)break;
+        const same=(o.thread||'')===v85ThreadKey();
+        try{
+          const j=await v85Gas('chat_send',{id:o.id,text:o.text,...(o.thread?{thread:o.thread}:{}),...(o.reply?{reply:{id:o.reply.id}}:{}),...(same?{since:v85LastTs()}:{})});
+          v85Ls.set(v85OutKey,v85Out().filter(x=>x.id!==o.id));
+          if(same){const added=v85Merge([j.message,...(j.messages||[])]);if(j.readByOther!=null)v85Chat.readByOther=Number(j.readByOther)||0;if(j.rev&&j.messages)v85Chat.rev=String(j.rev);v85Pres(j);v85SaveCache();if(added>1)try{navigator.vibrate?.(30)}catch{}}
+          if(v85Chat.open)v85Render();
+        }catch(e){
+          if(e.auth){v85Ls.set(v85OutKey,v85Out().filter(x=>x.id!==o.id));toast(e.message);continue}
+          v85Ls.set(v85OutKey,v85Out().map(x=>x.id===o.id?{...x,err:e.message||'error',tries:(x.tries||0)+1}:x));
+          if(v85Chat.open)v85Render();break;
+        }
+      }
+    }finally{v85Chat.pumping=false}
+  }
+  async function v85FlushOut(){await v85Pump()}
   async function v85Refresh(markRead){
     if(v85Chat.busy||!v85Code())return;v85Chat.busy=true;
     try{
-      await v85FlushOut();
-      const since=v85Chat.msgs.length?v85Chat.msgs[v85Chat.msgs.length-1].ts:0;
-      const tk=v85ThreadKey(),j=await v85Gas('chat_list',{since,...(tk?{thread:tk}:{})});
-      const added=v85Merge(j.messages);v85Chat.readByOther=Number(j.readByOther)||0;
-      if(v85Chat.open){if((j.unread>0||markRead)&&j.unread>0){try{await v85Gas('chat_read',tk?{thread:tk}:{})}catch{}}v85Chat.unread=tk?v85Chat.unread:0}
-      else{const prev=v85Chat.unread;v85Chat.unread=Number(j.unread)||0;if(v85Chat.unread>prev){const last=[...v85Chat.msgs].reverse().find(m=>m.from!==v85Me());if(last)toast(`💬 ${v85Other()}: ${last.media?(last.media.kind==='video'?'🎥 Video':'📷 Foto')+(last.media.once?' (ver una vez)':''):last.text.slice(0,70)}`)}}
-      v85SaveCache();if(v85Chat.open)v85Render();v85Badge();
-      if(added&&v85Chat.open&&!document.hidden)try{navigator.vibrate?.(30)}catch{}
+      if(v85Out().length)await v85Pump();
+      const tk=v85ThreadKey(),wasUnread=v85Chat.unread;
+      const j=await v85Gas('chat_list',{since:v85LastTs(),rev:v85Chat.rev||'',...(v85Chat.open?{markRead:true}:{}),...v85Tk()});
+      if(tk!==v85ThreadKey())return;
+      const typingBefore=!!v85Chat.other.typing,gotBefore=v85Chat.other.got||0,seenOn=Date.now()-(v85Chat.other.seen||0)<20000;
+      v85Pres(j);let added=0;
+      if(!j.unchanged){
+        added=v85Merge(j.messages);v85Chat.readByOther=Number(j.readByOther)||0;if(j.rev)v85Chat.rev=String(j.rev);
+        // Servidor anterior (sin markRead): se marca leído aparte
+        if(v85Chat.open&&j.unread>0&&!('otherSeen' in j)){try{await v85Gas('chat_read',v85Tk())}catch{}}
+        if(v85Chat.open){if(!tk)v85Chat.unread=0}
+        else{v85Chat.unread=Number(j.unread)||0;if(v85Chat.unread>wasUnread){const last=[...v85Chat.msgs].reverse().find(m=>m.from!==v85Me());if(last)toast(`💬 ${v85Other()}: ${last.media?(last.media.kind==='video'?'🎥 Video':'📷 Foto')+(last.media.once?' (ver una vez)':''):last.text.slice(0,70)}`)}}
+        v85SaveCache();v85Badge();
+      }
+      if(v85Chat.open){
+        const box=$('#v85ChList'),far=box&&box.scrollHeight-box.scrollTop-box.clientHeight>240;
+        if(added&&far)v85Chat.below+=added;
+        if(added||!j.unchanged||typingBefore!==!!v85Chat.other.typing||gotBefore!==(v85Chat.other.got||0))v85Render();else v85Head();
+        if(added&&!document.hidden)try{navigator.vibrate?.(30)}catch{}
+      }
     }catch(e){if(v85Chat.open&&e.auth)toast(e.message)}
     finally{v85Chat.busy=false}
   }
   function v85Send(){
     const inp=$('#v85ChInput');const text=(inp?.value||'').trim();if(!text)return;
-    const o={id:'c'+Date.now().toString(36)+Math.random().toString(36).slice(2,7),text:text.slice(0,1000),ts:Date.now(),thread:v85ThreadKey()};
-    v85Ls.set(v85OutKey,[...v85Out(),o]);inp.value='';inp.style.height='';v85Chat.forceScroll=true;v85Render();
-    v85Chat.busy=false;v85Refresh(true).then(()=>{if(v85Out().some(x=>x.id===o.id))toast('Sin conexión: lo envío apenas vuelva el internet.')});
+    const r=v85Chat.reply;
+    const o={id:'c'+Date.now().toString(36)+Math.random().toString(36).slice(2,7),text:text.slice(0,1000),ts:Date.now(),thread:v85ThreadKey(),...(r?{reply:{id:r.id,from:r.from,text:v85Snip(r).slice(0,120)}}:{})};
+    v85Ls.set(v85OutKey,[...v85Out(),o]);inp.value='';inp.style.height='';v85SetReply(null);v85Chat.newFrom=0;v85Chat.forceScroll=true;v85Render();inp.focus();
+    v85Pump().then(()=>{if(v85Out().some(x=>x.id===o.id))toast('Sin conexión: lo envío apenas vuelva el internet.')});
   }
   function v85BgPoll(){if(!document.hidden&&!v85Chat.open&&v85Code())v85Refresh(false)}
+  // "escribiendo…" (máx. una vez cada 4 s)
+  let v85TypAt=0;
+  function v85Typing(){const n=Date.now();if(n-v85TypAt<4000||!v85Chat.open)return;v85TypAt=n;v85Gas('chat_typing',v85Tk()).catch(()=>{})}
+  // Responder
+  function v85SetReply(m){
+    v85Chat.reply=m||null;const b=$('#v85Rep');if(!b)return;
+    if(!m){b.classList.add('hidden');b.innerHTML='';return}
+    b.innerHTML=`<div><b>${esc(v85NameOf(m.from))}</b><span>${esc(v85Snip(m))}</span></div><button class="secondary" data-v85-rep-x aria-label="Cancelar respuesta">✕</button>`;
+    b.classList.remove('hidden');setTimeout(()=>$('#v85ChInput')?.focus(),30);
+  }
+  const v85Find=id=>v85All().find(m=>m.id===id);
+  function v85Select(id){v85Chat.sel=id||null;$('#v85Chat')?.classList.toggle('sel',!!id);$$('.v85-row.selm').forEach(r=>r.classList.remove('selm'));if(id)document.querySelector(`.v85-row[data-v85-mid="${CSS.escape(id)}"]`)?.classList.add('selm')}
+  function v85Goto(id){const r=document.querySelector(`.v85-row[data-v85-mid="${CSS.escape(id)}"]`);if(!r){toast('Ese mensaje ya no está en el chat.');return}r.scrollIntoView({block:'center',behavior:'smooth'});r.classList.remove('flash');void r.offsetWidth;r.classList.add('flash')}
+  // Gestos: deslizar a la derecha = responder; mantener presionado = seleccionar (Responder / Copiar)
+  (function(){
+    let g=null;
+    document.addEventListener('touchstart',e=>{const row=e.target.closest?.('#v85ChList .v85-row');if(!row||e.touches.length!==1)return;const t=e.touches[0];
+      g={row,x:t.clientX,y:t.clientY,dx:0,lock:'',long:setTimeout(()=>{if(g&&!g.lock){v85Select(row.dataset.v85Mid);try{navigator.vibrate?.(25)}catch{}g=null}},480)}},{passive:true});
+    document.addEventListener('touchmove',e=>{if(!g)return;const t=e.touches[0],dx=t.clientX-g.x,dy=t.clientY-g.y;
+      if(!g.lock){if(Math.abs(dx)>10||Math.abs(dy)>10){clearTimeout(g.long);g.lock=Math.abs(dx)>Math.abs(dy)*1.3&&dx>0?'x':'y'}}
+      if(g.lock==='x'){g.dx=Math.max(0,Math.min(90,dx));g.row.style.transition='none';g.row.style.transform=`translateX(${g.dx}px)`;if(e.cancelable)e.preventDefault()}},{passive:false});
+    const end=()=>{if(!g)return;clearTimeout(g.long);const {row,dx,lock}=g;g=null;row.style.transition='';row.style.transform='';
+      if(lock==='x'&&dx>=60){const m=v85Find(row.dataset.v85Mid);if(m&&!m.pending){v85Select(null);v85SetReply(m);try{navigator.vibrate?.(20)}catch{}}}};
+    document.addEventListener('touchend',end);document.addEventListener('touchcancel',end);
+    // Con mouse (o si el teléfono no manda toques): clic derecho/mantener = seleccionar
+    document.addEventListener('contextmenu',e=>{const row=e.target.closest?.('#v85ChList .v85-row');if(!row)return;e.preventDefault();v85Select(row.dataset.v85Mid)});
+  })();
+  document.addEventListener('click',e=>{
+    const t=e.target;if(!t.closest||!t.closest('#v85Chat'))return;
+    const rt=t.closest('[data-v85-retry]');if(rt&&v85Out().some(x=>x.id===rt.dataset.v85Retry)){e.preventDefault();v85Ls.set(v85OutKey,v85Out().map(x=>({...x,tries:0,err:''})));v85Render();v85Pump();return}
+    const q=t.closest('[data-v85-goto]');if(q){e.preventDefault();v85Goto(q.dataset.v85Goto);return}
+    if(t.closest('[data-v85-rep-x]')){v85SetReply(null);return}
+    if(t.closest('[data-v85-down]')){const b=$('#v85ChList');if(b)b.scrollTo({top:b.scrollHeight,behavior:'smooth'});v85Chat.below=0;setTimeout(v85DownBtn,400);return}
+    if(t.closest('[data-v85-sel-x]')){v85Select(null);return}
+    if(t.closest('[data-v85-sel-reply]')){const m=v85Find(v85Chat.sel);v85Select(null);if(m&&!m.pending)v85SetReply(m);return}
+    if(t.closest('[data-v85-sel-copy]')){const m=v85Find(v85Chat.sel);v85Select(null);if(m){const s=m.text||'';try{navigator.clipboard.writeText(s).then(()=>toast('✓ Copiado')).catch(()=>prompt('Copia el texto:',s))}catch{prompt('Copia el texto:',s)}}return}
+    if(v85Chat.sel&&t.closest('.v85-row')){const id=t.closest('.v85-row').dataset.v85Mid;v85Select(id===v85Chat.sel?null:id);e.stopPropagation();return}
+  },true);
+  document.addEventListener('input',e=>{if(e.target.id==='v85ChInput'&&e.target.value.trim())v85Typing()});
 
   /* ---------- 3) Compartir la app libre (sin conexión con nosotros) ---------- */
   const V85_SHARE_TEXT=`💪 Mi Progreso Libre: app para registrar tu entrenamiento en el gimnasio (rutinas, series, descansos, récords, comidas y peso). Gratis y todo se guarda en tu teléfono.\n\nDescárgala aquí (Android):\n${V85_PUBLIC_URL}`;

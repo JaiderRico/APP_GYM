@@ -1,5 +1,5 @@
 // ============================================================================
-// BACKEND MI PROGRESO v19 — Google Apps Script (respaldo en Drive + app de Ella)
+// BACKEND MI PROGRESO v20 — Google Apps Script (respaldo en Drive + app de Ella)
 // ============================================================================
 // NOVEDAD v12 — DATOS POR USUARIO:
 //   La app de Ella (8.4.13+) manda app:'ella' en cada llamada. Con eso el backend sabe
@@ -14,6 +14,11 @@
 // ============================================================================
 // Carpeta "Mi Progreso v8.0":
 // https://drive.google.com/drive/folders/1hUkPHwACKs533vFBA0_D4VymitggIXKD
+//
+// v20: chat más rápido. chat_list acepta rev (si nada cambió responde sin abrir Drive), markRead (marca leído en la
+//      misma llamada) y devuelve presencia: otherSeen (última vez), otherTyping y otherGot (hasta dónde recibió).
+//      chat_typing avisa "escribiendo…". chat_send acepta since (devuelve los nuevos en la misma respuesta) y
+//      reply { id } para responder un mensaje. Todo es compatible con las apps anteriores.
 //
 // v19: las claves de IA ya NO salen del servidor. Las apps (8.5.17+) le piden la respuesta a la IA con la
 //      acción "ai" y este script llama a Groq con tus claves (rota entre ellas si una se agota). verify_code y
@@ -80,6 +85,9 @@
 //   chat_send      { code, app?, thread?, id, text } -> manda un mensaje al chat        (Ella o admin)
 //   chat_list      { code, app?, thread?, since? }   -> mensajes del chat y no leídos   (Ella o admin)
 //   chat_read      { code, app?, thread?, upTo? }    -> marca el chat como leído        (Ella o admin)
+//   chat_list      { …, rev?, markRead? }            -> (v20) unchanged:true si rev no cambió; otherSeen/otherTyping/otherGot
+//   chat_typing    { code, app?, thread? }           -> (v20) "escribiendo…" por 6 s (sin tocar Drive)
+//   chat_send      { …, since?, reply:{id}? }        -> (v20) también devuelve messages nuevos, rev y readByOther
 //   chat_send      { …, media:{ dataUrl, kind:'image'|'video', once, thumb?, w?, h?, dur? } } -> foto o video
 //   chat_media     { code, app?, thread?, id }       -> { dataUrl } del archivo (ver una vez: solo quien lo recibe, 1 vez)
 //     · App de Ella con su código -> chat "ella"; con el código admin (prueba) -> chat "prueba".
@@ -109,7 +117,7 @@ function prop_(k, respaldo) {
 const CODIGO_ELLA  = prop_('CODIGO_ELLA',  "TU_CODIGO_SECRETO_AQUI");
 const CODIGO_ADMIN = prop_('CODIGO_ADMIN', "TU_CODIGO_ADMIN");
 const GROQ_API_KEY = prop_('GROQ_API_KEY', "TU_API_KEY_DE_GROQ");
-const BACKEND_VERSION = 'v19';
+const BACKEND_VERSION = 'v20';
 // Todas las claves de Groq configuradas, sin repetir y en orden (la principal primero).
 function groqKeys_() {
   const out = [];
@@ -415,7 +423,25 @@ function loadChat(folder) {
 
 function saveChat(folder, chat) {
   upsertFile(folder, CHAT_FILE, JSON.stringify({ updatedAt: new Date().toISOString(), threads: chat.threads }, null, 2));
+  chatBump_();
 }
+// v20: "revisión" del chat en caché. Cambia con cada escritura; si la app ya la tiene, no hace falta leer Drive.
+function chatCache_() { return CacheService.getScriptCache(); }
+function chatBump_() { const r = String(Date.now()); try { chatCache_().put('chat_rev', r, 21600); } catch (e) { } return r; }
+function chatRev_() { let r = null; try { r = chatCache_().get('chat_rev'); } catch (e) { } return r; }
+function chatPresKey_(kind, thread, side) { return 'chat_' + kind + '_' + thread + '_' + side; }
+function chatPresence_(w) {
+  const c = chatCache_(), o = {};
+  try {
+    c.put(chatPresKey_('seen', w.thread, w.side), String(Date.now()), 21600);
+    const v = c.getAll([chatPresKey_('seen', w.thread, w.other), chatPresKey_('typ', w.thread, w.other), chatPresKey_('got', w.thread, w.other)]);
+    o.otherSeen = Number(v[chatPresKey_('seen', w.thread, w.other)]) || 0;
+    o.otherTyping = Number(v[chatPresKey_('typ', w.thread, w.other)]) > Date.now() - 6000;
+    o.otherGot = Number(v[chatPresKey_('got', w.thread, w.other)]) || 0;
+  } catch (e) { }
+  return o;
+}
+function chatGot_(w, ts) { try { if (ts) chatCache_().put(chatPresKey_('got', w.thread, w.side), String(ts), 21600); } catch (e) { } }
 
 function chatThread(chat, name) {
   const t = chat.threads[name] = chat.threads[name] || {};
@@ -881,12 +907,24 @@ const ACTIONS = {
       const last = t.messages.length ? Number(t.messages[t.messages.length - 1].ts) || 0 : 0;
       saved = { id: id, from: w.side, text: text, ts: Math.max(Date.now(), last + 1) };
       if (media) saved.media = media;
+      const rid = body.reply && String(body.reply.id || '');
+      const orig = rid && t.messages.filter(function (m) { return m.id === rid; })[0];
+      if (orig) saved.reply = { id: orig.id, from: orig.from, text: orig.media ? chatMediaLabel(orig).slice(0, 120) : String(orig.text || '').slice(0, 120) };
       t.messages.push(saved);
       if (t.messages.length > MAX_CHAT) { t.messages.slice(0, t.messages.length - MAX_CHAT).forEach(chatTrashMedia); t.messages = t.messages.slice(t.messages.length - MAX_CHAT); }
       t.read[w.side] = saved.ts;                            // lo mío cuenta como leído
       saveChat(folder, chat);
     });
-    return { ok: true, thread: w.thread, message: chatOut(saved) };
+    const out = { ok: true, thread: w.thread, message: chatOut(saved), rev: chatRev_() };
+    if (body.since != null) {                               // v20: de una vez, lo nuevo del chat
+      const t2 = chatThread(loadChat(folder), w.thread), since = Number(body.since) || 0;
+      out.messages = t2.messages.filter(function (m) { return Number(m.ts) > since; }).slice(-200).map(chatOut);
+      out.readByOther = Number(t2.read[w.other]) || 0;
+      out.unread = chatUnread(t2, w.side).length;
+      try { chatCache_().remove(chatPresKey_('typ', w.thread, w.side)); } catch (e) { }
+      Object.assign(out, chatPresence_(w));
+    }
+    return out;
   },
 
   chat_media: function (body, folder) {
@@ -913,7 +951,21 @@ const ACTIONS = {
 
   chat_list: function (body, folder) {
     const w = chatWho(body, requireRole(body, 'any'));
-    const t = chatThread(loadChat(folder), w.thread);
+    const pres = chatPresence_(w);
+    // v20: si la app ya tiene la última revisión, no se abre Drive
+    const rev = chatRev_();
+    if (rev && body.rev && String(body.rev) === rev) return Object.assign({ ok: true, thread: w.thread, me: w.side, unchanged: true, rev: rev, messages: [] }, pres);
+    folder = folder || getTargetFolder(body.folderId);
+    let chat = loadChat(folder), t = chatThread(chat, w.thread);
+    const lastTs = t.messages.length ? Number(t.messages[t.messages.length - 1].ts) || 0 : 0;
+    if (body.markRead && lastTs > (Number(t.read[w.side]) || 0) && chatUnread(t, w.side).length) {
+      withLock(function () {
+        chat = loadChat(folder); t = chatThread(chat, w.thread);
+        const lt = t.messages.length ? Number(t.messages[t.messages.length - 1].ts) || 0 : 0;
+        if (lt > (Number(t.read[w.side]) || 0)) { t.read[w.side] = lt; saveChat(folder, chat); }
+      });
+    }
+    chatGot_(w, lastTs);
     const since = Number(body.since) || 0;
     // Además de los nuevos, los "ver una vez" que se abrieron hace poco (para que quien los mandó vea "Abierta")
     const list = t.messages.filter(function (m) { return Number(m.ts) > since || (m.media && m.media.once && Number(m.media.opened) > Date.now() - 3 * 86400000); }).slice(-200).map(chatOut);
@@ -921,8 +973,17 @@ const ACTIONS = {
       ok: true, thread: w.thread, me: w.side, messages: list,
       unread: chatUnread(t, w.side).length,
       readByOther: Number(t.read[w.other]) || 0,
-      readByMe: Number(t.read[w.side]) || 0
+      readByMe: Number(t.read[w.side]) || 0,
+      rev: chatRev_() || chatBump_(),
+      otherSeen: pres.otherSeen || 0, otherTyping: !!pres.otherTyping, otherGot: pres.otherGot || 0
     };
+  },
+
+  // v20: "escribiendo…" (solo caché, no toca Drive)
+  chat_typing: function (body) {
+    const w = chatWho(body, requireRole(body, 'any'));
+    try { chatCache_().put(chatPresKey_('typ', w.thread, w.side), String(Date.now()), 30); } catch (e) { }
+    return { ok: true };
   },
 
   chat_read: function (body, folder) {
@@ -1110,12 +1171,13 @@ const ACTIONS = {
   }
 };
 
+// v20: estas acciones abren la carpeta solo si la necesitan (así el chat responde más rápido)
+const SIN_CARPETA = { chat_list: 1, chat_typing: 1, ai: 1, health: 1 };
 function route(body) {
-  const folder = getTargetFolder(body.folderId);
   const action = String(body.action || 'backup');
   const fn = ACTIONS[action];
   if (!fn) return { ok: false, error: 'Acción desconocida: ' + action };
-  return fn(body, folder);
+  return fn(body, SIN_CARPETA[action] ? null : getTargetFolder(body.folderId));
 }
 
 // ============================================================================

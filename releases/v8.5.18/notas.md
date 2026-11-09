@@ -1,0 +1,4 @@
+- 💬 Chat renovado tipo WhatsApp: envío instantáneo, ✓ enviado / ✓✓ recibido / ✓✓ azul leído, “en línea” y “escribiendo…”, mensajes más rápidos
+- ↩ Responder mensajes deslizándolos a la derecha (o mantener presionado → Responder / Copiar)
+- ◀ El gesto/botón de volver cierra el chat y las ventanas y vuelve al inicio antes de salir de la app
+- 🆕 Novedades de cada versión en Ajustes

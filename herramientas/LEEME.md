@@ -15,7 +15,7 @@
   del último Release y podrían bajar la libre.
 - Toda la interfaz y la lógica están en `assets/index.html` dentro de cada APK.
 - No hay proyecto de Android Studio: se edita la APK publicada más reciente y se vuelve a firmar.
-- `fuente/MiProgreso_Backend.gs` (v19): el backend (Google Apps Script). Las claves NO están en el código: viven en las Propiedades del script (CODIGO_ELLA, CODIGO_ADMIN, GROQ_API_KEY).
+- `fuente/MiProgreso_Backend.gs` (v20): el backend (Google Apps Script). Las claves NO están en el código: viven en las Propiedades del script (CODIGO_ELLA, CODIGO_ADMIN, GROQ_API_KEY).
   Al hacer push de un cambio a este archivo, el workflow **Actualizar Apps Script** lo sube con clasp, actualiza la misma implementación (la URL no cambia) y comprueba `?action=health`.
 - `fuente/MsgPoll.java`: código nativo que hace las notificaciones con la app cerrada (ya está dentro de las APK como classes6.dex, y `Reminders.onReceive` lo llama).
 - `fuente/Pip.java` (8.5.10, en classes7.dex): ventana flotante. La página usa `NativeStore.savePhoto('__pip__', 'supported'|'enter:9:16'|'auto:1'|'auto:0'|'active')`
@@ -36,6 +36,14 @@
 - `fuente/v850_comun.js`: el bloque 8.5.10 que va en las dos apps (antes de `initV7();`): chat, varias claves de IA,
   compartir la app libre, ventana flotante y (Jaider) aviso de pedidos de Ella. Si lo cambias, vuelve a pegarlo en los
   dos `index.html` reemplazando el bloque anterior.
+- `fuente/v880_comun.js` (8.5.18, **las tres apps**): (1) botón/gesto de volver: la parte nativa hace `webView.goBack()`
+  si hay historial y si no cierra la app, así que mientras haya algo abierto (visor, chat, selección/respuesta del chat,
+  ventanas `.modal`, el modo libre de Ella, otra pestaña o un entreno) la página deja una entrada con `history.pushState`
+  y en `popstate` cierra lo de encima (`v88Top`); en Inicio sin nada abierto no hay entrada y volver sale de la app.
+  En pleno entreno pregunta antes de salir (usa `#exitFocus`, que guarda la sesión). (2) **Novedades**: lista `V88_NOV`
+  (versión, fecha y textos marcados `j`/`e`/`l` para cada app), se ve siempre en Ajustes → 🆕 Novedades y una vez al
+  actualizar (`mp_nov_seen_v1`). **En cada versión nueva agrega arriba su entrada en `V88_NOV`** y pega el bloque en los
+  dos `index.html` justo antes de `initV7();` (en la de Ella después de v870). La libre lo hereda de la de Jaider.
 - `fuente/v870_ella_comidas.js` (8.5.17, **solo app de Ella**): registrar comidas es obligatorio (la pestaña Comida
   siempre está, el cuestionario ya no lo pregunta) y 3 snacks al día altos en calorías y poco saciantes (le cuesta comer):
   tarjeta arriba en Comida con ideas y botón "+ Lo comí" (se guarda como comida tipo `snack` con kcal/proteína), aviso en
@@ -79,6 +87,12 @@
 - Sin API keys ni códigos dentro de las APK (el repo es público).
 - Pedidos de Ella (backend v14): ella escribe en Ajustes → "Pedir cambios para la app"; quedan en `pedidos_app_ella.json`
   y Jaider los ve y los marca desde "Progreso de Ella". Si eres Claude y te piden "lo que pidió ella", están ahí.
+- Chat tipo WhatsApp (backend v20, apps 8.5.18): el envío va a una cola en el teléfono (`mp_chat_out_v1`) y se ve al
+  instante con 🕓; `chat_send` con `since` devuelve de una vez lo nuevo. Mientras el chat está abierto, cada 2,5 s se llama
+  `chat_list` con `rev`: si nada cambió el servidor responde desde CacheService sin abrir Drive (`unchanged:true`).
+  `markRead:true` marca leído en la misma llamada. Presencia sin tocar Drive: `otherSeen` ("en línea" si < 20 s),
+  `otherTyping` (`chat_typing`, dura 6 s) y `otherGot` (✓✓ gris: le llegó); ✓✓ azul = `readByOther`. Responder: deslizar
+  el mensaje a la derecha o mantenerlo presionado → Responder/Copiar; se guarda `reply:{id,from,text}` en el mensaje.
 - Chat (backend v15): `chat_send` / `chat_list` / `chat_read`, guardado en `chat_mi_progreso.json`. La app de Ella con su
   código usa el chat "ella"; con el código admin (prueba) usa "prueba". En la app de Jaider el botón 🧪 Prueba muestra ese.
   `pending_notifications` avisa los mensajes sin leer (y los pedidos de Ella) aunque la app esté cerrada (~15 min).
