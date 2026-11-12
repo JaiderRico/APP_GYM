@@ -6,7 +6,7 @@
   const V89_CACHE='mp_snacks_v1';
   const v89={user:'ella',list:null,at:0,busy:false,edit:null,err:''};
   function v89Call(action,extra={}){return V85_ELLA?herGas(action,extra):gas(action,{...extra,...(v89.user==='prueba'?{user:'prueba'}:{})})}
-  const v89CacheKey=()=>V89_CACHE+(V85_ELLA?'':'_'+v89.user);
+  const v89CacheKey=()=>V89_CACHE+(V85_ELLA?'':'_'+(v89.user==='prueba'?'prueba':((typeof mpPersona==='function'&&mpPersona())||'ella')));  // 8.5.21: una lista por persona
   // Lista guardada en el teléfono (null si nunca se ha traído)
   function v89Cached(){try{const c=JSON.parse(localStorage.getItem(v89CacheKey())||'null');return c&&Array.isArray(c.list)?c:null}catch{return null}}
   function v89Store(j){v89.list=j.list||[];v89.at=Number(j.updatedAt)||0;try{localStorage.setItem(v89CacheKey(),JSON.stringify({list:v89.list,updatedAt:v89.at,syncedAt:Date.now()}))}catch{}}
@@ -15,7 +15,7 @@
     const c=v89Cached();if(!force&&c&&Date.now()-(Number(c.syncedAt)||0)<5*60000){v89.list=c.list;return false}
     try{const j=await v89Call('snacks_get');const changed=!c||JSON.stringify(c.list)!==JSON.stringify(j.list);v89Store(j);return changed}catch(e){v89.err=e.message||'';return false}
   }
-  const v89Who=x=>x.by==='jaider'?(V85_ELLA?'💡 Sugerido por Jaider':'💡 Tu sugerencia'):x.by==='ella'?(V85_ELLA?'✍️ Lo agregaste tú':'✍️ Lo agregó ella'):'';
+  const v89Who=x=>x.by==='jaider'?(V85_ELLA?'💡 Sugerido por Jaider':'💡 Tu sugerencia'):x.by==='ella'?(V85_ELLA?'✍️ Lo agregaste tú':'✍️ Lo agregó '+v85Other()):'';
 
   document.head.insertAdjacentHTML('beforeend',`<style id="v89css">
     .v89{position:fixed;inset:0;z-index:9100;background:var(--bg);display:flex;flex-direction:column}
@@ -45,7 +45,7 @@
     const b=$('#v89Body');if(!b)return;
     const L=v89.list,seg=V85_ELLA?'':`<div class="v89-seg"><button class="secondary ${v89.user==='ella'?'on':''}" data-v89-user="ella">Lista de ${esc(v85Other())}</button><button class="secondary ${v89.user==='prueba'?'on':''}" data-v89-user="prueba">🧪 Prueba</button></div>`;
     const intro=V85_ELLA?'<p class="small" style="margin-top:0">Estos son los snacks que te recomienda la app varias veces al día. Quita los que no te gusten o no uses y agrega los tuyos. Jaider también te puede sugerir.</p>'
-      :`<p class="small" style="margin-top:0">Esta es la lista que la app de ${esc(v85Other())} le recomienda varias veces al día. Lo que agregues le llega como sugerencia (con notificación); ella puede quitarlo si no lo usa.</p>`;
+      :`<p class="small" style="margin-top:0">Esta es la lista que la app de ${esc(v85Other())} le recomienda varias veces al día. Lo que agregues le llega como sugerencia (con notificación); lo puede quitar si no lo usa.</p>`;
     b.innerHTML=seg+intro+v89FormHtml()+(v89.err?`<div class="small" style="color:#ff6b6b;margin-bottom:8px">⚠ ${esc(v89.err)}</div>`:'')+
       (L==null?'<p class="small">Cargando…</p>':!L.length?'<p class="small">La lista está vacía. Agrega al menos uno.</p>':
       `<b>${L.length} snack${L.length===1?'':'s'}</b>`+L.map(x=>`<div class="v89-it"><div class="t"><b>${esc(x.t)}</b><span>${x.k?`~${x.k} kcal`:''}${x.k&&x.p?' · ':''}${x.p?`${x.p} g proteína`:''}${x.w?` · ${esc(x.w)}`:''}</span>${v89Who(x)?`<span class="tag">${v89Who(x)}</span>`:''}</div><button class="secondary" data-v89-edit="${esc(x.id)}" aria-label="Editar">✏️</button><button class="secondary" data-v89-del="${esc(x.id)}" aria-label="Quitar">🗑</button></div>`).join('')+

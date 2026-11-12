@@ -15,7 +15,7 @@
   del último Release y podrían bajar la libre.
 - Toda la interfaz y la lógica están en `assets/index.html` dentro de cada APK.
 - No hay proyecto de Android Studio: se edita la APK publicada más reciente y se vuelve a firmar.
-- `fuente/MiProgreso_Backend.gs` (v22): el backend (Google Apps Script). Las claves NO están en el código: viven en las Propiedades del script (CODIGO_ELLA, CODIGO_ADMIN, GROQ_API_KEY).
+- `fuente/MiProgreso_Backend.gs` (v23): el backend (Google Apps Script). Las claves NO están en el código: viven en las Propiedades del script (CODIGO_ELLA, CODIGO_ADMIN, GROQ_API_KEY).
   Al hacer push de un cambio a este archivo, el workflow **Actualizar Apps Script** lo sube con clasp, actualiza la misma implementación (la URL no cambia) y comprueba `?action=health`.
 - `fuente/MsgPoll.java`: código nativo que hace las notificaciones con la app cerrada (ya está dentro de las APK como classes6.dex, y `Reminders.onReceive` lo llama).
 - `fuente/Pip.java` (8.5.10, en classes7.dex): ventana flotante. La página usa `NativeStore.savePhoto('__pip__', 'supported'|'enter:9:16'|'auto:1'|'auto:0'|'active')`
@@ -50,6 +50,19 @@
   mejor serie y tendencia), Comidas por día (marca los días sin registro) y Peso/medidas. Lee `get_her_data` (su copia
   completa en la nube; reutiliza `hmState.raw`). "💬 Comentarle" abre el chat con el texto empezado. Va antes de `initV7();`
   en el `index.html` de Jaider (después de v890). En la de Ella, Novedades le avisa que Jaider ve sus entrenos y comidas.
+- `fuente/v910_personas.js` (8.5.21, **solo app de Jaider**; la libre lo trae apagado): **varias personas en la app de Ella**.
+  En Ajustes → 👥 Personas Jaider crea personas (nombre → código `PE-XXXX-XXXX`, backend v23: `usr_create`, `usr_list`,
+  `usr_update {name?, revoke?, share?, newCode?}`, `usr_delete`). Se guardan en la propiedad del script `USUARIOS_APP`
+  (no en Drive). Con ese código la app de Ella funciona igual que con Ella, pero todo lo de esa persona (progreso, historial,
+  fotos, mensajes, rutinas, pedidos, chat y snacks) va en su carpeta `Mi Progreso - Personas/<nombre> (<id>)` en la raíz
+  de Mi unidad (`USR_FOLDER_ID`), fuera de la carpeta compartida. `share:false` = no ve los entrenos de Jaider (`get_my_data`).
+  "Persona actual" (`localStorage mp_persona_v1`, vacío = Ella): `gas()` le agrega `user:<id>` (el backend también acepta
+  `thread:<id>` en el chat), y `v85ThreadKey`, la caché de snacks (v890), el resumen/respuestas de la tarjeta de Inicio
+  (`HM_*` + `mpPersonaSfx()`) y los pedidos nuevos (v850) van por persona. En el seguimiento (v900) hay botones para
+  cambiar de persona (`v91ChipsHtml`). La vista "Ella" del historial (8.1) siempre pide `user:'ella'`.
+  Avisos con la app cerrada: `go:chat:<id>` y `go:persona:<id>`. Sin `user`, todo sigue siendo de Ella (apps viejas).
+  Va antes de `initV7();`, después de v900, en el `index.html` de Jaider. Las funciones `mpPersona*` son declaradas
+  (no `const`) para que v850/v890 las usen con `typeof mpPersona==='function'`.
 - `fuente/v890_snacks.js` (8.5.19, apps de **Jaider y Ella**; la libre lo trae apagado por `MP_PUBLICA`): editor de la
   lista de snacks de Ella, guardada en el servidor (`snacks_ella.json`, acciones `snacks_get` / `snacks_edit` con
   `op: add|upd|del|reset`, backend v21; usuario `ella` o `prueba` como el resto). Ella lo abre desde Comida → “✏️ Mi lista”;
@@ -96,7 +109,7 @@
 - Firma: siempre la misma clave (certificado SHA-256 `f7d6a22c…0d7d`), guardada como secreto `FIRMA_PEM` del repo. Con otra clave el teléfono no deja actualizar. **Nunca subir la clave al repo ni pedirla.**
 - App de Ella: es para una amiga. Nada romántico: sin corazones ni frases que se puedan malinterpretar; tono de entrenador.
 - No decir "Drive" ni "carpeta compartida" en la app de Ella: decir "la nube".
-- Datos por usuario: la app de Ella manda `app:'ella'` en cada llamada al backend. Con el código de Ella usa los archivos de ella; con el código de administrador (Jaider probando) usa `progreso_prueba.json`.
+- Datos por usuario: la app de Ella manda `app:'ella'` en cada llamada al backend. Con el código de Ella usa los archivos de ella; con el código de administrador (Jaider probando) usa `progreso_prueba.json`; con el código de otra persona (v23) usa la carpeta de esa persona.
 - Sin API keys ni códigos dentro de las APK (el repo es público).
 - Pedidos de Ella (backend v14): ella escribe en Ajustes → "Pedir cambios para la app"; quedan en `pedidos_app_ella.json`
   y Jaider los ve y los marca desde "Progreso de Ella". Si eres Claude y te piden "lo que pidió ella", están ahí.

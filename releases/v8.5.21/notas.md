@@ -1,0 +1,3 @@
+- Varias personas en la app de Ella: Jaider crea un código para cada persona (Ajustes → 👥 Personas) y cada una tiene sus datos aparte.
+- Seguimiento, chat, mensajes, rutinas, snacks y pedidos por persona, con botones para cambiar de persona y avisos de cada una.
+- Requiere el backend v23.

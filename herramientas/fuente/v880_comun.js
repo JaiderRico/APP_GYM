@@ -54,6 +54,11 @@
   // a: j = Mi Progreso (Jaider), e = Ella, l = Libre. Al publicar una versión, agrega arriba su entrada.
   const V88_APP=(typeof MP_PUBLICA!=='undefined'&&MP_PUBLICA)?'l':(MP_APK_IS_ELLA?'e':'j');
   const V88_NOV=[
+    {v:'8.5.21',f:'2026-11-11',i:[
+      ['j','👥 Personas: en Ajustes → 👥 Personas creas un código para cada persona que quieras que use la app de Ella. Cada una tiene sus datos aparte, en su propia carpeta.'],
+      ['j','👤 En el seguimiento (tarjeta de Inicio) eliges a quién ver con los botones de arriba. Chat, mensajes, rutinas, snacks y pedidos son los de esa persona.'],
+      ['j','🔔 Te llegan los avisos de cada persona (respuestas, pedidos, chat y entrenos) y al tocarlos se abre la persona correcta.'],
+      ['e','🔒 Tus datos siguen siendo solo tuyos: si alguien más usa esta app, tiene su propio espacio aparte y no ve nada tuyo.']]},
     {v:'8.5.20',f:'2026-11-08',i:[
       ['j','👩 Pantalla de seguimiento de Ella (tarjeta de Inicio): resumen, accesos a chat, snacks, pedidos y mensajes, y todo su historial.'],
       ['j','🏋️ Sus entrenos completos, con filtro por fechas (o un solo día) y por ejercicio: ves cada serie y, por ejercicio, su mejor serie y cómo va.'],

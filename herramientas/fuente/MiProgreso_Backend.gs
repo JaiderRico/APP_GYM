@@ -1,5 +1,17 @@
 // ============================================================================
-// BACKEND MI PROGRESO v22 — Google Apps Script (respaldo en Drive + app de Ella)
+// BACKEND MI PROGRESO v23 — Google Apps Script (respaldo en Drive + app de Ella)
+// ============================================================================
+// NOVEDAD v23 — VARIAS PERSONAS EN LA APP DE ELLA:
+//   Jaider crea personas desde su app (Ajustes → 👥 Personas): nombre -> código propio (PE-XXXX-XXXX).
+//   Se guardan en la propiedad del script USUARIOS_APP (no en Drive). Con ese código, la app de Ella
+//   funciona igual que con Ella, pero todo lo de esa persona (progreso, historial, fotos, mensajes,
+//   rutinas, pedidos, chat y snacks) va en SU carpeta: "Mi Progreso - Personas/<nombre> (<id>)" en la
+//   raíz de Mi unidad (USR_FOLDER_ID), fuera de la carpeta compartida con Ella.
+//   Ella sigue con CODIGO_ELLA y sus archivos de siempre; el código admin en la app de Ella sigue siendo "prueba".
+//   Desde la app de Jaider, las acciones de seguimiento aceptan user:'<id>' (o thread:'<id>' en el chat)
+//   para trabajar con esa persona; sin user siguen siendo de Ella (compatible con las apps anteriores).
+//   usr_create { code, name } · usr_list { code } · usr_update { code, id, name?, revoke?, share?, newCode? }
+//   usr_delete { code, id }  (solo admin; la carpeta queda)
 // ============================================================================
 // NOVEDAD v12 — DATOS POR USUARIO:
 //   La app de Ella (8.4.13+) manda app:'ella' en cada llamada. Con eso el backend sabe
@@ -102,6 +114,10 @@
 //   chat_media     { code, app?, thread?, id }       -> { dataUrl } del archivo (ver una vez: solo quien lo recibe, 1 vez)
 //     · App de Ella con su código -> chat "ella"; con el código admin (prueba) -> chat "prueba".
 //     · App de Jaider -> chat "ella" (o thread:'prueba' para ver el de prueba).
+//   usr_create     { code, name, share? }         -> (v23) persona nueva con su código  (solo admin)
+//   usr_list / usr_update { id, name?, revoke?, share?, newCode? } / usr_delete { id }   (solo admin)
+//     · Desde la app de Jaider, user:'<id>' (o thread:'<id>') hace que get_her_data, mensajes, rutinas,
+//       pedidos, chat y snacks sean de esa persona. Sin user: Ella (como siempre).
 //   pro_create     { code, name, days }           -> crea un código Pro temporal        (solo admin)
 //   pro_list       { code }                       -> códigos Pro y su estado            (solo admin)
 //   pro_update     { code, id, days?, revoke?, release? } -> alarga / revoca / reactiva / libera el teléfono (solo admin)
@@ -127,7 +143,7 @@ function prop_(k, respaldo) {
 const CODIGO_ELLA  = prop_('CODIGO_ELLA',  "TU_CODIGO_SECRETO_AQUI");
 const CODIGO_ADMIN = prop_('CODIGO_ADMIN', "TU_CODIGO_ADMIN");
 const GROQ_API_KEY = prop_('GROQ_API_KEY', "TU_API_KEY_DE_GROQ");
-const BACKEND_VERSION = 'v22';
+const BACKEND_VERSION = 'v23';
 // Todas las claves de Groq configuradas, sin repetir y en orden (la principal primero).
 function groqKeys_() {
   const out = [];
@@ -333,8 +349,82 @@ function roleOf(code) {
   if (!code) return null;
   if (code === CODIGO_ADMIN) return 'admin';
   if (code === CODIGO_ELLA) return 'ella';
+  if (usrByCode_(code)) return 'ella';      // v23: otra persona de la app de Ella (mismos permisos que Ella)
   return null;
 }
+
+// ============================================================================
+// Personas de la app de Ella (v23)
+// ============================================================================
+const USR_PROP = 'USUARIOS_APP';
+const USR_ROOT_NAME = 'Mi Progreso - Personas';
+const USR_MAX = 40;
+const USR_RESERVADOS = { ella: 1, prueba: 1, jaider: 1, admin: 1 };
+let usrCache_ = null;
+function usrLoad_() {
+  if (usrCache_) return usrCache_;
+  try { const v = PropertiesService.getScriptProperties().getProperty(USR_PROP); const d = v ? JSON.parse(v) : []; usrCache_ = Array.isArray(d) ? d : []; }
+  catch (e) { usrCache_ = []; }
+  return usrCache_;
+}
+function usrSave_(list) { usrCache_ = list; PropertiesService.getScriptProperties().setProperty(USR_PROP, JSON.stringify(list)); }
+function usrByCode_(code) {
+  const c = proNorm(code);
+  if (!c) return null;
+  return usrLoad_().filter(function (r) { return !r.revoked && proNorm(r.code) === c; })[0] || null;
+}
+function usrById_(id) {
+  id = String(id || '');
+  if (!id || USR_RESERVADOS[id]) return null;
+  return usrLoad_().filter(function (r) { return r.id === id; })[0] || null;
+}
+function usrNewCode_(list) {
+  const pro = proLoad();
+  for (let t = 0; t < 50; t++) {
+    let c = 'PE';
+    for (let i = 0; i < 8; i++) c += PRO_LETRAS.charAt(Math.floor(Math.random() * PRO_LETRAS.length));
+    const usado = list.some(function (x) { return proNorm(x.code) === c; }) || pro.some(function (x) { return proNorm(x.code) === c; });
+    if (!usado && c !== proNorm(CODIGO_ELLA) && c !== proNorm(CODIGO_ADMIN)) return c.slice(0, 2) + '-' + c.slice(2, 6) + '-' + c.slice(6);
+  }
+  throw new Error('No se pudo generar un código');
+}
+function usrPublic_(x) {
+  return { id: x.id, name: x.name, code: x.code, createdAt: x.createdAt || 0, revoked: !!x.revoked, share: x.share !== false,
+    lastUse: x.lastUse || 0, lastSync: x.lastSync || 0 };
+}
+function usrTouch_(id, fields) {
+  try {
+    withLock(function () {
+      usrCache_ = null;
+      const list = usrLoad_();
+      list.forEach(function (r) { if (r.id === id) Object.keys(fields).forEach(function (k) { r[k] = fields[k]; }); });
+      usrSave_(list);
+    });
+  } catch (e) { }
+}
+function usrRootFolder_() {
+  const props = PropertiesService.getScriptProperties();
+  const id = props.getProperty('USR_FOLDER_ID');
+  if (id) { try { return DriveApp.getFolderById(id); } catch (e) { } }
+  const it = DriveApp.getRootFolder().getFoldersByName(USR_ROOT_NAME);
+  const f = it.hasNext() ? it.next() : DriveApp.getRootFolder().createFolder(USR_ROOT_NAME);
+  props.setProperty('USR_FOLDER_ID', f.getId());
+  return f;
+}
+// Carpeta privada de una persona (se busca por id; si Jaider le cambió el nombre, sigue siendo la misma)
+function usrFolder_(x) {
+  if (x.folderId) { try { const f = DriveApp.getFolderById(x.folderId); if (!f.isTrashed || !f.isTrashed()) return f; } catch (e) { } }
+  const root = usrRootFolder_(), suf = ' (' + x.id + ')';
+  let f = null;
+  const it = root.getFolders();
+  while (it.hasNext()) { const g = it.next(); if (g.getName().slice(-suf.length) === suf) { f = g; break; } }
+  if (!f) f = root.createFolder((String(x.name || 'persona').replace(/[\\/:*?"<>|]+/g, ' ').trim().slice(0, 40) || 'persona') + suf);
+  x.folderId = f.getId();
+  usrTouch_(x.id, { folderId: x.folderId });
+  return f;
+}
+// Nombre para avisos y mensajes
+function usrName_(uid) { if (uid === 'ella') return 'Ella'; if (uid === 'prueba') return 'Prueba'; const r = usrById_(uid); return r ? r.name : 'Alguien'; }
 
 // need: 'any' (Ella o admin) | 'admin'
 function requireRole(body, need) {
@@ -347,11 +437,31 @@ function requireRole(body, need) {
 
 // ¿Quién está usando la app de Ella? (la de Jaider no manda app:'ella' y siempre ve a "ella")
 function fromHerApp(body) { return String(body.app || '') === 'ella'; }
+// Usuario de la app de Ella: 'ella', 'prueba' (código admin en la app de Ella) o el id de otra persona (v23).
 function userOf(body, role) {
-  if (fromHerApp(body) && role === 'admin') return 'prueba';
+  if (role === 'admin') return fromHerApp(body) ? 'prueba' : adminTarget_(body);
+  const r = usrByCode_(body.code);
+  return r ? r.id : 'ella';
+}
+// Desde la app de Jaider: ¿con quién? (user o thread; sin nada -> Ella, como antes)
+function adminTarget_(body) {
+  const c = [body.thread, body.user].map(function (x) { return String(x || ''); });
+  if (c.indexOf('prueba') >= 0) return 'prueba';
+  for (let i = 0; i < c.length; i++) if (usrById_(c[i])) return c[i];
+  // Una persona que ya se borró: error (para no mostrarle a Jaider los datos de Ella con el nombre de otra)
+  if (c.some(function (x) { return /^u[0-9a-f]{9}$/.test(x); })) throw new Error('Esa persona ya no existe');
   return 'ella';
 }
-function userCfg(body, role) { return USUARIOS[userOf(body, role)]; }
+const CFG_PERSONA = { file: 'progreso.json', photos: 'Fotos', daily: 'progreso_', legacy: [] };
+// Dónde están las cosas de un usuario: Ella y prueba en la carpeta de siempre; las demás personas en la suya.
+function space_(uid, folder, body) {
+  if (USUARIOS[uid]) return { uid: uid, folder: folder || getTargetFolder(body && body.folderId), cfg: USUARIOS[uid], legacy: true };
+  const r = usrById_(uid);
+  if (!r) throw new Error('Esa persona ya no existe');
+  return { uid: uid, folder: usrFolder_(r), cfg: CFG_PERSONA, legacy: false, rec: r };
+}
+function spaceOf(body, role, folder) { return space_(userOf(body, role), folder, body); }
+function userCfg(body, role) { return USUARIOS[userOf(body, role)] || CFG_PERSONA; }
 function photoFolder(folder, cfg, create) {
   const hit = folder.getFoldersByName(cfg.photos);
   if (hit.hasNext()) return hit.next();
@@ -484,8 +594,10 @@ function chatThread(chat, name) {
 function chatWho(body, role) {
   if (fromHerApp(body)) return { side: 'ella', other: 'jaider', thread: userOf(body, role) };
   if (role !== 'admin') throw new Error('Código inválido o faltante');
-  return { side: 'jaider', other: 'ella', thread: String(body.thread || '') === 'prueba' ? 'prueba' : 'ella' };
+  return { side: 'jaider', other: 'ella', thread: adminTarget_(body) };
 }
+// v23: el chat de Ella y el de prueba siguen en la carpeta de siempre; el de otra persona, en la suya.
+function chatFolder_(w, folder, body) { return space_(w.thread, folder, body).folder; }
 
 function chatUnread(t, side) {
   const seen = Number(t.read[side]) || 0;
@@ -514,7 +626,7 @@ const SNACKS_BASE = [
 function snackUser_(body, role) {
   if (fromHerApp(body)) return userOf(body, role);
   if (role !== 'admin') throw new Error('Código inválido o faltante');
-  return String(body.user || '') === 'prueba' ? 'prueba' : 'ella';
+  return adminTarget_(body);
 }
 function snackLoad_(folder, u) {
   const f = findFile(folder, SNACK_FILE);
@@ -610,7 +722,10 @@ const ACTIONS = {
   verify_code: function (body) {
     const role = roleOf(body.code);
     if (!role) return { ok: false, error: 'Código inválido' };
-    return Object.assign({ ok: true, role: role, user: userOf(body, role) }, infoClaves_());
+    const out = Object.assign({ ok: true, role: role, user: userOf(body, role) }, infoClaves_());
+    const r = role !== 'admin' && usrByCode_(body.code);
+    if (r) { out.name = r.name; out.share = r.share !== false; usrTouch_(r.id, { lastUse: Date.now() }); }
+    return out;
   },
 
   // v19: la app manda la consulta y el servidor la hace con sus claves (nunca salen de aquí).
@@ -629,26 +744,27 @@ const ACTIONS = {
 
   sync_her_data: function (body, folder) {
     const role = requireRole(body, 'any');
-    const u = userCfg(body, role);
+    const sp = spaceOf(body, role, folder), u = sp.cfg;
     if (body.payload == null) throw new Error('Falta payload');
     const content = toContent(body.payload);
     const f = withLock(function () {
-      const master = upsertFile(folder, u.file, content);
+      const master = upsertFile(sp.folder, u.file, content);
       if (body.keepDaily !== false) {
-        upsertFile(getHistoryFolder(folder), u.daily + todayStr() + '.json', content);
+        upsertFile(getHistoryFolder(sp.folder), u.daily + todayStr() + '.json', content);
       }
       return master;
     });
-    return { ok: true, user: userOf(body, role), fileId: f.getId(), updatedAt: new Date().toISOString() };
+    if (sp.rec) usrTouch_(sp.uid, { lastSync: Date.now(), lastUse: Date.now() });
+    return { ok: true, user: sp.uid, fileId: f.getId(), updatedAt: new Date().toISOString() };
   },
 
   // Jaider lo revisa desde su app; Ella lo usa para restaurar su respaldo si cambia de teléfono.
   get_her_data: function (body, folder) {
     const role = requireRole(body, 'any');
-    const u = userCfg(body, role);
-    const f = newestFile(folder, [u.file].concat(u.legacy));
-    if (!f) return { ok: false, error: userOf(body, role) === 'prueba' ? 'Aún no hay respaldo de prueba.' : 'Ella aún no ha sincronizado su progreso.' };
-    return { ok: true, user: userOf(body, role), file: f.getName(), updatedAt: f.getLastUpdated().toISOString(), payload: readJsonFile(f) };
+    const sp = spaceOf(body, role, folder), u = sp.cfg;
+    const f = newestFile(sp.folder, [u.file].concat(u.legacy));
+    if (!f) return { ok: false, error: sp.uid === 'prueba' ? 'Aún no hay respaldo de prueba.' : sp.rec ? sp.rec.name + ' aún no ha sincronizado su progreso.' : 'Ella aún no ha sincronizado su progreso.' };
+    return { ok: true, user: sp.uid, file: f.getName(), updatedAt: f.getLastUpdated().toISOString(), payload: readJsonFile(f) };
   },
 
   sync_my_data: function (body, folder) {
@@ -659,7 +775,8 @@ const ACTIONS = {
   },
 
   get_my_data: function (body, folder) {
-    requireRole(body, 'any');
+    const role = requireRole(body, 'any');
+    if (role !== 'admin') { const r = usrByCode_(body.code); if (r && r.share === false) return { ok: false, error: 'Jaider no tiene registros compartidos contigo.' }; }
     const f = newestFile(folder, [MY_FILE].concat(MY_LEGACY_FILES));
     if (!f) return { ok: false, error: 'Jaider aún no tiene registros compartidos.' };
     const full = readJsonFile(f);
@@ -672,6 +789,7 @@ const ACTIONS = {
 
   send_message: function (body, folder) {
     requireRole(body, 'admin');
+    folder = spaceOf(body, 'admin', folder).folder;
     const text = String(body.text || '').trim().slice(0, MAX_TEXTO_MENSAJE);
     if (!text) throw new Error('El mensaje está vacío');
     const msg = {
@@ -692,7 +810,8 @@ const ACTIONS = {
 
   get_messages: function (body, folder) {
     const role = requireRole(body, 'any');
-    const tester = userOf(body, role) === 'prueba';
+    const sp = spaceOf(body, role, folder); folder = sp.folder;
+    const tester = sp.uid === 'prueba';
     let all = loadMessages(folder);
     all = all.map(tester ? viewAsTester : withoutTest);
     // Ella recibe solo los pendientes; Jaider (admin, desde su app) ve todos con su estado de lectura.
@@ -703,7 +822,8 @@ const ACTIONS = {
 
   mark_read: function (body, folder) {
     const role = requireRole(body, 'any');
-    const tester = userOf(body, role) === 'prueba';
+    const sp = spaceOf(body, role, folder); folder = sp.folder;
+    const tester = sp.uid === 'prueba';
     let ids = body.ids || (body.id ? [body.id] : []);
     if (typeof ids === 'string') ids = ids.split(',');
     ids = ids.map(String);
@@ -725,6 +845,7 @@ const ACTIONS = {
 
   delete_message: function (body, folder) {
     requireRole(body, 'admin');
+    folder = spaceOf(body, 'admin', folder).folder;
     let removed = 0;
     withLock(function () {
       const list = loadMessages(folder);
@@ -737,7 +858,8 @@ const ACTIONS = {
 
   send_reply: function (body, folder) {
     const role = requireRole(body, 'any');
-    const tester = userOf(body, role) === 'prueba';
+    const sp = spaceOf(body, role, folder); folder = sp.folder;
+    const tester = sp.uid === 'prueba';
     const emoji = String(body.emoji || '').slice(0, 8);
     const text = String(body.text || '').trim().slice(0, MAX_TEXTO_MENSAJE);
     if (!emoji && !text) throw new Error('Respuesta vacía');
@@ -761,6 +883,7 @@ const ACTIONS = {
 
   send_routine: function (body, folder) {
     requireRole(body, 'admin');
+    folder = spaceOf(body, 'admin', folder).folder;
     const r = body.routine || {};
     const items = (Array.isArray(r.items) ? r.items : []).map(String).map(function (x) { return x.trim().slice(0, 70); }).filter(String).slice(0, 20);
     if (!items.length) throw new Error('La rutina no tiene ejercicios');
@@ -789,7 +912,8 @@ const ACTIONS = {
 
   get_routines: function (body, folder) {
     const role = requireRole(body, 'any');
-    const tester = userOf(body, role) === 'prueba';
+    const sp = spaceOf(body, role, folder); folder = sp.folder;
+    const tester = sp.uid === 'prueba';
     const f = findFile(folder, ROUTINE_FILE);
     let all = f ? (readJsonFile(f).routines || []) : [];
     all = all.map(tester ? viewAsTester : withoutTest);
@@ -799,7 +923,8 @@ const ACTIONS = {
 
   ack_routine: function (body, folder) {
     const role = requireRole(body, 'any');
-    const tester = userOf(body, role) === 'prueba';
+    const sp = spaceOf(body, role, folder); folder = sp.folder;
+    const tester = sp.uid === 'prueba';
     let ids = body.ids || (body.id ? [body.id] : []);
     if (typeof ids === 'string') ids = ids.split(',');
     ids = ids.map(String);
@@ -820,6 +945,7 @@ const ACTIONS = {
 
   delete_routine: function (body, folder) {
     requireRole(body, 'admin');
+    folder = spaceOf(body, 'admin', folder).folder;
     let removed = 0;
     withLock(function () {
       const f = findFile(folder, ROUTINE_FILE);
@@ -836,7 +962,8 @@ const ACTIONS = {
     const role = requireRole(body, 'any');
     const text = String(body.text || '').trim().slice(0, MAX_TEXTO_MENSAJE);
     if (!text) throw new Error('El pedido está vacío');
-    const user = userOf(body, role);
+    const sp = spaceOf(body, role, folder); folder = sp.folder;
+    const user = sp.uid;
     const req = {
       id: String(body.id || Utilities.getUuid()).slice(0, 64),
       user: user,
@@ -859,16 +986,18 @@ const ACTIONS = {
 
   get_requests: function (body, folder) {
     const role = requireRole(body, 'any');
-    let list = loadRequests(folder);
-    if (fromHerApp(body) || role !== 'admin') {
-      const user = userOf(body, role);
+    const sp = spaceOf(body, role, folder);
+    let list = loadRequests(sp.folder);
+    if (fromHerApp(body) || role !== 'admin' || !sp.legacy) {
+      const user = sp.uid;
       list = list.filter(function (r) { return (r.user || 'ella') === user; });
     }
-    return { ok: true, requests: list.slice().reverse() };
+    return { ok: true, user: sp.uid, requests: list.slice().reverse() };
   },
 
   update_request: function (body, folder) {
     requireRole(body, 'admin');
+    folder = spaceOf(body, 'admin', folder).folder;
     const status = String(body.status || '');
     if (ESTADOS_PEDIDO.indexOf(status) < 0) throw new Error('Estado inválido');
     let found = null;
@@ -889,7 +1018,8 @@ const ACTIONS = {
 
   delete_request: function (body, folder) {
     const role = requireRole(body, 'any');
-    const user = userOf(body, role);
+    const sp = spaceOf(body, role, folder); folder = sp.folder;
+    const user = sp.uid;
     const admin = role === 'admin' && !fromHerApp(body);
     let removed = 0;
     withLock(function () {
@@ -904,7 +1034,7 @@ const ACTIONS = {
   },
 
   backup_photo: function (body, folder) {
-    const u = userCfg(body, requireRole(body, 'any'));
+    const sp = spaceOf(body, requireRole(body, 'any'), folder), u = sp.cfg; folder = sp.folder;
     const id = String(body.id || '').replace(/[^a-zA-Z0-9_-]/g, '').slice(0, 40);
     const date = String(body.date || '').replace(/[^0-9-]/g, '').slice(0, 10);
     const m = String(body.dataUrl || '').match(/^data:(image\/(?:jpeg|png|webp));base64,(.+)$/);
@@ -923,7 +1053,8 @@ const ACTIONS = {
   },
 
   list_photos: function (body, folder) {
-    const dir = photoFolder(folder, userCfg(body, requireRole(body, 'any')), false);
+    const sp = spaceOf(body, requireRole(body, 'any'), folder);
+    const dir = photoFolder(sp.folder, sp.cfg, false);
     const out = [];
     if (dir) {
       const it = dir.getFiles();
@@ -937,7 +1068,8 @@ const ACTIONS = {
   },
 
   get_photo: function (body, folder) {
-    const dir = photoFolder(folder, userCfg(body, requireRole(body, 'any')), false);
+    const sp = spaceOf(body, requireRole(body, 'any'), folder);
+    const dir = photoFolder(sp.folder, sp.cfg, false);
     const id = String(body.id || '').replace(/[^a-zA-Z0-9_-]/g, '');
     if (!id || !dir) return { ok: false, error: 'No hay fotos respaldadas.' };
     const it = dir.getFiles();
@@ -953,6 +1085,7 @@ const ACTIONS = {
 
   chat_send: function (body, folder) {
     const w = chatWho(body, requireRole(body, 'any'));
+    folder = chatFolder_(w, folder, body);
     const text = String(body.text || '').trim().slice(0, MAX_TEXTO_CHAT);
     const id = String(body.id || Utilities.getUuid()).replace(/[^a-zA-Z0-9_-]/g, '').slice(0, 64) || Utilities.getUuid();
     let media = null, mediaBytes = null;
@@ -1005,6 +1138,7 @@ const ACTIONS = {
 
   chat_media: function (body, folder) {
     const w = chatWho(body, requireRole(body, 'any'));
+    folder = chatFolder_(w, folder, body);
     const id = String(body.id || '');
     let out = null, err = '';
     withLock(function () {
@@ -1031,7 +1165,7 @@ const ACTIONS = {
     // v20: si la app ya tiene la última revisión, no se abre Drive
     const rev = chatRev_();
     if (rev && body.rev && String(body.rev) === rev) return Object.assign({ ok: true, thread: w.thread, me: w.side, unchanged: true, rev: rev, messages: [] }, pres);
-    folder = folder || getTargetFolder(body.folderId);
+    folder = chatFolder_(w, folder, body);
     let chat = loadChat(folder), t = chatThread(chat, w.thread);
     const lastTs = t.messages.length ? Number(t.messages[t.messages.length - 1].ts) || 0 : 0;
     if (body.markRead && lastTs > (Number(t.read[w.side]) || 0) && chatUnread(t, w.side).length) {
@@ -1057,12 +1191,14 @@ const ACTIONS = {
 
   snacks_get: function (body, folder) {
     const role = requireRole(body, 'any'), u = snackUser_(body, role);
+    folder = space_(u, folder, body).folder;
     const s = snackLoad_(folder, u);
     return { ok: true, user: u, list: s.list, updatedAt: s.updatedAt };
   },
 
   snacks_edit: function (body, folder) {
     const role = requireRole(body, 'any'), u = snackUser_(body, role);
+    folder = space_(u, folder, body).folder;
     const by = fromHerApp(body) ? 'ella' : 'jaider';
     const op = String(body.op || '');
     let out = null;
@@ -1099,6 +1235,7 @@ const ACTIONS = {
 
   chat_read: function (body, folder) {
     const w = chatWho(body, requireRole(body, 'any'));
+    folder = chatFolder_(w, folder, body);
     let at = 0;
     withLock(function () {
       const chat = loadChat(folder), t = chatThread(chat, w.thread);
@@ -1202,6 +1339,65 @@ const ACTIONS = {
     return { ok: true, updatedAt: f.getLastUpdated().toISOString(), payload: readJsonFile(f) };
   },
 
+  // v23: personas de la app de Ella (solo admin)
+  usr_create: function (body) {
+    requireRole(body, 'admin');
+    const name = String(body.name || '').replace(/\s+/g, ' ').trim().slice(0, 40);
+    if (!name) throw new Error('Escribe el nombre de la persona');
+    let rec = null;
+    withLock(function () {
+      usrCache_ = null;
+      const list = usrLoad_();
+      if (list.length >= USR_MAX) throw new Error('Ya hay ' + USR_MAX + ' personas: borra alguna primero');
+      let id;
+      do { id = 'u' + Utilities.getUuid().replace(/-/g, '').slice(0, 9); } while (list.some(function (r) { return r.id === id; }));
+      rec = { id: id, name: name, code: usrNewCode_(list), createdAt: Date.now(), revoked: false, share: body.share !== false && body.share !== 'false', lastUse: 0, lastSync: 0 };
+      list.push(rec);
+      usrSave_(list);
+    });
+    return { ok: true, user: usrPublic_(rec) };
+  },
+
+  usr_list: function (body) {
+    requireRole(body, 'admin');
+    return { ok: true, users: usrLoad_().map(usrPublic_) };
+  },
+
+  usr_update: function (body) {
+    requireRole(body, 'admin');
+    let found = null;
+    withLock(function () {
+      usrCache_ = null;
+      const list = usrLoad_();
+      list.forEach(function (r) {
+        if (r.id !== String(body.id)) return;
+        const name = String(body.name || '').replace(/\s+/g, ' ').trim().slice(0, 40);
+        if (name) r.name = name;
+        if (body.revoke === true || body.revoke === 'true') r.revoked = true;
+        if (body.revoke === false || body.revoke === 'false') r.revoked = false;
+        if (body.share === true || body.share === 'true') r.share = true;
+        if (body.share === false || body.share === 'false') r.share = false;
+        if (body.newCode === true || body.newCode === 'true') r.code = usrNewCode_(list);
+        found = r;
+      });
+      if (found) usrSave_(list);
+    });
+    if (!found) return { ok: false, error: 'Persona no encontrada' };
+    return { ok: true, user: usrPublic_(found) };
+  },
+
+  usr_delete: function (body) {
+    requireRole(body, 'admin');
+    let removed = 0;
+    withLock(function () {
+      usrCache_ = null;
+      const list = usrLoad_(), keep = list.filter(function (r) { return r.id !== String(body.id); });
+      removed = list.length - keep.length;
+      if (removed) usrSave_(keep);
+    });
+    return { ok: true, removed: removed };
+  },
+
   // Comprobación para la automatización de GitHub (no revela ninguna clave).
   health: function () {
     return { ok: true, version: BACKEND_VERSION, clavesConfiguradas: clavesConfiguradas_(), clavesIA: groqKeys_().length, iaPermiso: iaPermiso_() };
@@ -1214,7 +1410,8 @@ const ACTIONS = {
     const role = requireRole(body, 'any');
     const items = [];
     if (fromHerApp(body)) {
-      const tester = userOf(body, role) === 'prueba';
+      const sp = spaceOf(body, role, folder); folder = sp.folder;
+      const tester = sp.uid === 'prueba';
       loadMessages(folder).map(tester ? viewAsTester : withoutTest).forEach(function (m) {
         if (!m.read) items.push({ id: 'msg:' + m.id, title: '📩 Nuevo mensaje de Jaider', text: m.text, action: 'go:home' });
       });
@@ -1265,6 +1462,10 @@ const ACTIONS = {
           items.push({ id: 'w:' + (w.id || (w.date + ':' + w.title)), title: '✅ Ella terminó su entreno', text: (w.title || 'Entrenamiento') + (series ? ' · ' + series + ' series' : ''), action: 'go:history' });
         });
       }
+      // v23: lo mismo para cada persona (cada una en su carpeta)
+      usrLoad_().filter(function (x) { return !x.revoked; }).forEach(function (x) {
+        try { notifPersona_(x, items); } catch (e) { }
+      });
     }
     return { ok: true, items: items.slice(-20) };
   },
@@ -1286,8 +1487,35 @@ const ACTIONS = {
   }
 };
 
+// v23: avisos para la app de Jaider sobre una persona (respuestas, pedidos, chat y entrenos de las últimas 36 h)
+function notifPersona_(x, items) {
+  const f = usrFolder_(x), n = x.name || 'Alguien', lim = Date.now() - 36 * 3600000, go = 'go:persona:' + x.id;
+  loadMessages(f).forEach(function (m) {
+    const r = m.reply;
+    if (!r || Date.parse(r.at || 0) < lim) return;
+    items.push({ id: 'rep:' + m.id + ':' + r.at, title: '💬 ' + n + ' respondió tu mensaje', text: ((r.emoji || '') + ' ' + (r.text || '')).trim() || 'Reaccionó a tu mensaje', action: go });
+  });
+  loadRequests(f).forEach(function (q) {
+    if (q.status !== 'pendiente' || Number(q.createdAt || 0) < lim) return;
+    items.push({ id: 'ped:' + q.id, title: '💡 ' + n + ' pidió un cambio para su app', text: q.text, action: go });
+  });
+  chatUnread(chatThread(loadChat(f), x.id), 'jaider').forEach(function (m) {
+    if (Number(m.ts) < lim) return;
+    items.push({ id: 'chat:' + m.id, title: '💬 ' + n, text: chatMediaLabel(m), action: 'go:chat:' + x.id, button: 'Responder' });
+  });
+  const pf = findFile(f, CFG_PERSONA.file);
+  if (pf && pf.getLastUpdated().getTime() > lim) {
+    const d = readJsonFile(pf), limite = Utilities.formatDate(new Date(lim), TZ, 'yyyy-MM-dd');
+    ((d && d.workouts) || []).forEach(function (w) {
+      if (!w || String(w.date || '') < limite) return;
+      const series = (w.exercises || []).reduce(function (k, e) { return k + ((e.sets || []).length); }, 0);
+      items.push({ id: 'w:' + x.id + ':' + (w.id || (w.date + ':' + w.title)), title: '✅ ' + n + ' terminó su entreno', text: (w.title || 'Entrenamiento') + (series ? ' · ' + series + ' series' : ''), action: go });
+    });
+  }
+}
+
 // v20: estas acciones abren la carpeta solo si la necesitan (así el chat responde más rápido)
-const SIN_CARPETA = { chat_list: 1, chat_typing: 1, ai: 1, health: 1 };
+const SIN_CARPETA = { chat_list: 1, chat_typing: 1, ai: 1, health: 1, usr_create: 1, usr_list: 1, usr_update: 1, usr_delete: 1 };
 function route(body) {
   const action = String(body.action || 'backup');
   const fn = ACTIONS[action];
@@ -1335,5 +1563,6 @@ function probarConfiguracion() {
   Logger.log('Códigos configurados: ' + clavesConfiguradas_());
   Logger.log('Claves de IA configuradas: ' + groqKeys_().length + (clavesEnApp_() ? ' (se entregan a las apps: CLAVES_IA_EN_APP=1)' : ' (se quedan en el servidor)'));
   Logger.log('Códigos Pro: ' + proLoad().length + ' (carpeta: ' + PRO_ROOT_NAME + ')');
+  Logger.log('Personas en la app de Ella: ' + usrLoad_().length + ' (carpeta: ' + USR_ROOT_NAME + ')');
   Logger.log('Mensajes en el chat: ' + (chatThread(loadChat(folder), 'ella').messages.length));
 }

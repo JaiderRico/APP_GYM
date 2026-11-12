@@ -232,7 +232,7 @@
     @keyframes v85ty{30%{transform:translateY(-4px);opacity:1}0%,60%,100%{opacity:.4}}
   </style>`);
   const v85Chat={open:false,thread:'',msgs:[],readByOther:0,unread:0,timer:0,bgTimer:0,busy:false,rev:'',other:{},reply:null,sel:null,newFrom:0,below:0};
-  const v85ThreadKey=()=>V85_ELLA?'':(v85Chat.thread==='prueba'?'prueba':'');
+  const v85ThreadKey=()=>V85_ELLA?'':(v85Chat.thread==='prueba'?'prueba':(typeof mpPersona==='function'?mpPersona():''));  // 8.5.21: '' = Ella, o el id de otra persona
   const v85CacheKey=()=>'mp_chat_v1_'+(v85ThreadKey()||'main');
   const v85OutKey='mp_chat_out_v1';
   const v85Tk=()=>{const tk=v85ThreadKey();return tk?{thread:tk}:{}};
@@ -473,7 +473,7 @@
         added=v85Merge(j.messages);v85Chat.readByOther=Number(j.readByOther)||0;if(j.rev)v85Chat.rev=String(j.rev);
         // Servidor anterior (sin markRead): se marca leído aparte
         if(v85Chat.open&&j.unread>0&&!('otherSeen' in j)){try{await v85Gas('chat_read',v85Tk())}catch{}}
-        if(v85Chat.open){if(!tk)v85Chat.unread=0}
+        if(v85Chat.open){if(tk!=='prueba')v85Chat.unread=0}
         else{v85Chat.unread=Number(j.unread)||0;if(v85Chat.unread>wasUnread){const last=[...v85Chat.msgs].reverse().find(m=>m.from!==v85Me());if(last)toast(`💬 ${v85Other()}: ${last.media?(last.media.kind==='video'?'🎥 Video':'📷 Foto')+(last.media.once?' (ver una vez)':''):last.text.slice(0,70)}`)}}
         v85SaveCache();v85Badge();
       }
@@ -648,11 +648,13 @@
   async function v85CheckRequests(){
     if(V85_ELLA||!v85Code())return;
     try{
-      const j=await gas('get_requests');const seen=v85Ls.get('mp_req_seen_v1',null);
-      const pend=(j.requests||[]).filter(r=>r.status==='pendiente'&&(r.user||'ella')==='ella');
-      if(seen===null){v85Ls.set('mp_req_seen_v1',pend.map(r=>r.id));return}
+      const per=typeof mpPersona==='function'?mpPersona():'',sk='mp_req_seen_v1'+(per?'_'+per:'');
+      const j=await gas('get_requests');const seen=v85Ls.get(sk,null);
+      if(per!==(typeof mpPersona==='function'?mpPersona():''))return;
+      const pend=(j.requests||[]).filter(r=>r.status==='pendiente'&&(r.user||'ella')===(per||'ella'));
+      if(seen===null){v85Ls.set(sk,pend.map(r=>r.id));return}
       const nuevos=pend.filter(r=>!seen.includes(r.id));
-      v85Ls.set('mp_req_seen_v1',[...new Set([...seen,...pend.map(r=>r.id)])].slice(-300));
+      v85Ls.set(sk,[...new Set([...seen,...pend.map(r=>r.id)])].slice(-300));
       v85Chat.reqNew=(v85Chat.reqNew||[]).concat(nuevos).slice(-5);
       if(nuevos.length){toast(`💡 ${v85Other()} pidió un cambio para su app`);v85ReqCard()}
     }catch{}

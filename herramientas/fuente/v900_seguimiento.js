@@ -71,8 +71,8 @@
     try{if(!hmCode()){openHerModal();return}}catch{}
     if(tab)v90.tab=tab;
     $('#v90')?.remove();document.body.classList.add('v90-on');
-    document.body.insertAdjacentHTML('beforeend',`<div class="v90" id="v90" role="dialog" aria-modal="true"><div class="v90-h"><button class="bk" data-v90-close aria-label="Volver">‹</button><div class="t"><b>👩 ${esc(v90Name())}</b><span id="v90Sub"></span></div><button class="secondary rf" data-v90-refresh aria-label="Actualizar">↻</button></div>
-      <div class="v90-tabs">${[['res','Resumen'],['w','🏋️ Entrenos'],['m','🍽 Comidas'],['p','⚖️ Peso']].map(([k,l])=>`<button data-v90-tab="${k}" class="${v90.tab===k?'on':''}">${l}</button>`).join('')}</div><div class="v90-b" id="v90B"></div></div>`);
+    document.body.insertAdjacentHTML('beforeend',`<div class="v90" id="v90" role="dialog" aria-modal="true"><div class="v90-h"><button class="bk" data-v90-close aria-label="Volver">‹</button><div class="t"><b>${typeof mpPersona==='function'&&mpPersona()?'👤':'👩'} ${esc(v90Name())}</b><span id="v90Sub"></span></div><button class="secondary rf" data-v90-refresh aria-label="Actualizar">↻</button></div>
+      ${typeof v91ChipsHtml==='function'?v91ChipsHtml():''}<div class="v90-tabs">${[['res','Resumen'],['w','🏋️ Entrenos'],['m','🍽 Comidas'],['p','⚖️ Peso']].map(([k,l])=>`<button data-v90-tab="${k}" class="${v90.tab===k?'on':''}">${l}</button>`).join('')}</div><div class="v90-b" id="v90B"></div></div>`);
     v90Paint();v90Load(false);
   }
   function v90Close(){$('#v90')?.remove();document.body.classList.remove('v90-on')}
