@@ -1,0 +1,4 @@
+- Al crear una persona eliges su app (rosa o libre), qué puede usar (ver tus entrenos, chat, mensajes y rutinas, IA y copia en la nube) y si el código vence.
+- La app libre se conecta contigo con un código de persona; los códigos Pro viejos siguen funcionando.
+- La app rosa muestra solo lo que la persona tiene activado.
+- Requiere el backend v24.

@@ -1,0 +1,1 @@
+- Si te dieron un código, ahora también puede activar chat, mensajes y rutinas o ver los entrenos de quien te lo dio.

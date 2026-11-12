@@ -1,6 +1,8 @@
   /* ===================== v8.5.0 (+8.5.15 ventana flotante, +8.5.17 IA por el servidor, +8.5.18 chat tipo WhatsApp): chat, varias claves de IA, compartir la app libre y ventana flotante ===================== */
   // (Mismo bloque en las dos apps; MP_APK_IS_ELLA decide los textos y qué helper usa para hablar con el servidor.)
-  const V85_ELLA=!!MP_APK_IS_ELLA;
+  // 8.5.22: la app libre conectada con un código de persona (con chat) habla con el servidor como la de Ella
+  // (pubConectada/herGas/herCode/herUrl/kvGet vienen de publica.js, solo en la libre).
+  const V85_ELLA=!!MP_APK_IS_ELLA||(typeof MP_PUBLICA!=='undefined'&&!!MP_PUBLICA&&typeof pubConectada==='function'&&pubConectada());
   const V85_PUBLIC_URL='https://github.com/JaiderRico/APP_GYM/releases/download/publica/MiProgreso_Libre.apk';
   const V85_PUBLIC_PAGE='https://github.com/JaiderRico/APP_GYM/releases/tag/publica';
   function v85Code(){try{return V85_ELLA?herCode():hmCode()}catch{return ''}}
@@ -670,9 +672,8 @@
   const v85Fecha=ts=>new Date(Number(ts)||0).toLocaleDateString('es-CO',{day:'numeric',month:'short',year:'numeric'});
   function v85ProHtml(){
     const L=v85Pro.list;
-    const form=`<p class="small" style="margin-top:0">Con un código vigente, la app libre usa la IA (con tus claves) y guarda su copia en su propia carpeta de tu Drive: “Mi Progreso - Usuarios Pro”, fuera de la carpeta compartida. Al vencer vuelve a la versión gratis sin perder sus datos. Los códigos solo los ves tú. Cada código sirve en un solo teléfono.</p>
-      <div class="row" style="gap:8px;flex-wrap:nowrap"><input id="v85ProName" maxlength="40" placeholder="Nombre de la persona" autocomplete="off" style="flex:2;min-width:0;padding:11px;border-radius:12px;border:1px solid var(--line);background:var(--panel2);color:var(--text);font:inherit"><select id="v85ProDays" style="flex:1;min-width:0;padding:11px;border-radius:12px;border:1px solid var(--line);background:var(--panel2);color:var(--text);font:inherit"><option value="7">7 días</option><option value="30" selected>30 días</option><option value="90">90 días</option><option value="365">1 año</option></select></div>
-      <button class="primary" data-v85-pro-new style="margin-top:8px;width:100%">Crear código</button>`;
+    // 8.5.22: los códigos nuevos (con app y permisos) se crean en 👥 Personas; aquí solo se administran los Pro viejos.
+    const form=`<p class="small" style="margin-top:0">Los códigos nuevos se crean en <b>👥 Personas</b>: eliges “App libre” y qué puede usar (IA y nube, chat, mensajes, ver tus entrenos). Aquí siguen los códigos Pro que ya habías creado; funcionan igual que antes.</p>`;
     if(v85Pro.err)return form+`<p class="small" style="color:#ffb4a2">${esc(v85Pro.err)}</p>`;
     if(!L)return form+'<p class="small">Cargando códigos…</p>';
     if(!L.length)return form+'<p class="small">Aún no has creado códigos.</p>';
@@ -698,7 +699,7 @@
       const pip=v85Pip.ok?`<details class="settings-group" id="v85PipSet"><summary>⧉ Ventana flotante</summary><div class="settings-section" id="v85PipBody">${v85PipSetHtml()}</div></details>`:'';
       const keys=`<details class="settings-group v85-keys" id="v85KeysSet"><summary>🔑 Claves de IA (${v85Pool('groq',(()=>{try{return aiCfg().key||''}catch{return ''}})()).length+(v85Via()?1:0)}${v85Via()?' · 🔒 servidor':''})</summary><div class="settings-section" id="v85KeysBody">${v85KeysHtml()}</div></details>`;
       const chat=v85Code()?`<details class="settings-group"><summary>💬 Chat con ${esc(v85Other())}</summary><div class="settings-section"><p class="small" style="margin-top:0">Escríbanse desde la app. Te aviso con una notificación aunque esté cerrada (puede tardar unos minutos).</p><button class="secondary" data-v85-chat>Abrir chat</button></div></details>`:'';
-      const pro=(!V85_ELLA&&v85Code())?`<details class="settings-group" id="v85ProSet"><summary>✦ Códigos Pro (app libre)</summary><div class="settings-section" id="v85ProBody">${v85ProHtml()}</div></details>`:'';
+      const pro=(!V85_ELLA&&v85Code())?`<details class="settings-group" id="v85ProSet"><summary>✦ Códigos Pro antiguos (app libre)</summary><div class="settings-section" id="v85ProBody">${v85ProHtml()}</div></details>`:'';
       box.insertAdjacentHTML('beforeend',chat+pro+pip+keys);
       $('#v85ProSet')?.addEventListener('toggle',e=>{if(e.target.open)v85ProLoad()});
     }catch(e){console.error(e)}

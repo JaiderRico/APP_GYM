@@ -13,6 +13,9 @@
   const v90Norm=s=>String(s||'').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').trim();
   const v90DayAdd=(d,n)=>{const x=new Date(d+'T12:00:00');x.setDate(x.getDate()+n);return x.toLocaleDateString('en-CA')};
   const v90Today=()=>new Date().toLocaleDateString('en-CA');
+  // 8.5.22: lo que tiene activado la persona elegida (Ella: todo) y si usa la app libre
+  const v90Can=k=>{try{return typeof mpPersonaPuede!=='function'||mpPersonaPuede(k)}catch{return true}};
+  const v90Libre=()=>{try{return typeof mpPersonaLibre==='function'&&mpPersonaLibre()}catch{return false}};
 
   document.head.insertAdjacentHTML('beforeend',`<style id="v90css">
     .v90{position:fixed;inset:0;z-index:36;background:var(--bg);display:flex;flex-direction:column}
@@ -80,7 +83,7 @@
     const b=$('#v90B');if(!b)return;
     $$('[data-v90-tab]').forEach(x=>x.classList.toggle('on',x.dataset.v90Tab===v90.tab));
     const s=$('#v90Sub');if(s)s.textContent=v90.loading?'Actualizando…':v90.at?`Copia de su app · ${ago(v90.at)}`:'';
-    if(!v90.raw){b.innerHTML=v90.err?`<div class="v90-card">⚠ ${esc(v90.err)}</div>`:'<p class="small">Cargando su progreso…</p>';return}
+    if(!v90.raw){b.innerHTML=(v90.err?`<div class="v90-card">⚠ ${esc(v90.err)}${v90Can('ia')?'':'<p class="small" style="margin:6px 0 0">No tiene activada “IA y copia en la nube”, así que su app no guarda copia. Actívalo en Ajustes → 👥 Personas.</p>'}</div>`:'<p class="small">Cargando su progreso…</p>')+(v90.err&&v90Can('chat')?'<div class="v90-go"><button class="secondary" data-v90-chat>💬 Chat<small>Escríbele</small></button></div>':'');return}
     const sc=b.scrollTop;
     b.innerHTML=v90.err?`<div class="v90-card small">⚠ ${esc(v90.err)}</div>`:'';
     b.insertAdjacentHTML('beforeend',v90.tab==='w'?v90WHtml():v90.tab==='m'?v90MHtml():v90.tab==='p'?v90PHtml():v90ResHtml());
@@ -93,8 +96,8 @@
     const last=W[0];
     return `<div class="v90-tiles"><div><b>${w7}</b><small>entrenos en 7 días</small></div><div><b>${w30}</b><small>en 30 días</small></div><div><b>${last?esc(ago(Date.parse(last.date+'T12:00:00'))):'—'}</b><small>último entreno</small></div>
       <div><b>${md}/7</b><small>días con comidas</small></div><div><b>${v90N(sn/7)}</b><small>snacks por día</small></div><div><b>${M.filter(m=>m.date===t).length}</b><small>comidas hoy</small></div></div>
-      <div class="v90-go"><button class="secondary" data-v90-chat>💬 Chat<small>Escríbele</small></button><button class="secondary" data-v89-open="ella">🥤 Snacks<small>Ver y sugerir</small></button>
-      <button class="secondary" data-v90-req>💡 Pedidos<small>Lo que pidió para su app</small></button><button class="secondary" data-v90-hm>📩 Mensajes y rutinas<small>Progreso, sorpresas, rutinas</small></button></div>
+      <div class="v90-go">${v90Can('chat')?'<button class="secondary" data-v90-chat>💬 Chat<small>Escríbele</small></button>':''}${v90Libre()?'':'<button class="secondary" data-v89-open="ella">🥤 Snacks<small>Ver y sugerir</small></button>'}
+      ${v90Libre()?'':'<button class="secondary" data-v90-req>💡 Pedidos<small>Lo que pidió para su app</small></button>'}<button class="secondary" data-v90-hm>📩 ${v90Can('msgs')?'Mensajes y rutinas':'Su progreso'}<small>${v90Can('msgs')?'Progreso, sorpresas, rutinas':'Resumen y respuestas'}</small></button></div>
       <div class="row" style="justify-content:space-between;align-items:baseline"><b>Últimos entrenos</b><a href="#" data-v90-tab="w" class="small">Ver todos ›</a></div>
       ${W.slice(0,3).map(v90WCard).join('')||'<p class="v90-empty">Aún no hay entrenos.</p>'}
       <div class="row" style="justify-content:space-between;align-items:baseline;margin-top:6px"><b>Comidas de hoy</b><a href="#" data-v90-tab="m" class="small">Ver todas ›</a></div>

@@ -54,6 +54,11 @@
   // a: j = Mi Progreso (Jaider), e = Ella, l = Libre. Al publicar una versión, agrega arriba su entrada.
   const V88_APP=(typeof MP_PUBLICA!=='undefined'&&MP_PUBLICA)?'l':(MP_APK_IS_ELLA?'e':'j');
   const V88_NOV=[
+    {v:'8.5.22',f:'2026-11-12',i:[
+      ['j','👥 Al crear una persona eliges su app (👩 rosa o 🧔 libre), qué puede usar (ver tus entrenos, chat, mensajes y rutinas, IA y copia en la nube) y si el código vence. Todo se cambia después tocando cada permiso.'],
+      ['j','✦ Los códigos nuevos se crean solo en 👥 Personas; los códigos Pro que ya tenías siguen funcionando.'],
+      ['e','🔄 Tu app muestra solo lo que tienes activado. Si Jaider te cambia algo, te avisa al abrirla.'],
+      ['l','🔗 Si te dieron un código, ahora también puede activar chat, mensajes y rutinas, o ver los entrenos de quien te lo dio (según lo que te hayan dado). Se escribe en el mismo lugar que el código Pro.']]},
     {v:'8.5.21',f:'2026-11-11',i:[
       ['j','👥 Personas: en Ajustes → 👥 Personas creas un código para cada persona que quieras que use la app de Ella. Cada una tiene sus datos aparte, en su propia carpeta.'],
       ['j','👤 En el seguimiento (tarjeta de Inicio) eliges a quién ver con los botones de arriba. Chat, mensajes, rutinas, snacks y pedidos son los de esa persona.'],

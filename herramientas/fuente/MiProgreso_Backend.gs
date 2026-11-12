@@ -1,5 +1,12 @@
 // ============================================================================
-// BACKEND MI PROGRESO v23 — Google Apps Script (respaldo en Drive + app de Ella)
+// BACKEND MI PROGRESO v24 — Google Apps Script (respaldo en Drive + app de Ella)
+// ============================================================================
+// NOVEDAD v24 — APP Y PERMISOS POR PERSONA:
+//   Cada persona tiene app: 'ella' (la rosa) o 'libre' (la pública, que con un código PE- se conecta igual),
+//   perms { ver, chat, msgs, ia } (ver = tus entrenos; msgs = mensajes y rutinas; ia = IA + copia en la nube)
+//   y, si quieres, expiresAt (vence sola). Los códigos Pro viejos (MP-) siguen funcionando igual.
+//   usr_create { name, app?, perms?, days? } · usr_update { id, perms?, app?, days? (alarga), noExpire? }
+//   Lo que una persona no tiene: su app recibe listas vacías (mensajes, rutinas, chat) o un aviso claro.
 // ============================================================================
 // NOVEDAD v23 — VARIAS PERSONAS EN LA APP DE ELLA:
 //   Jaider crea personas desde su app (Ajustes → 👥 Personas): nombre -> código propio (PE-XXXX-XXXX).
@@ -114,7 +121,7 @@
 //   chat_media     { code, app?, thread?, id }       -> { dataUrl } del archivo (ver una vez: solo quien lo recibe, 1 vez)
 //     · App de Ella con su código -> chat "ella"; con el código admin (prueba) -> chat "prueba".
 //     · App de Jaider -> chat "ella" (o thread:'prueba' para ver el de prueba).
-//   usr_create     { code, name, share? }         -> (v23) persona nueva con su código  (solo admin)
+//   usr_create     { code, name, app?, perms?, days? } -> (v23/v24) persona nueva con su código  (solo admin)
 //   usr_list / usr_update { id, name?, revoke?, share?, newCode? } / usr_delete { id }   (solo admin)
 //     · Desde la app de Jaider, user:'<id>' (o thread:'<id>') hace que get_her_data, mensajes, rutinas,
 //       pedidos, chat y snacks sean de esa persona. Sin user: Ella (como siempre).
@@ -143,7 +150,7 @@ function prop_(k, respaldo) {
 const CODIGO_ELLA  = prop_('CODIGO_ELLA',  "TU_CODIGO_SECRETO_AQUI");
 const CODIGO_ADMIN = prop_('CODIGO_ADMIN', "TU_CODIGO_ADMIN");
 const GROQ_API_KEY = prop_('GROQ_API_KEY', "TU_API_KEY_DE_GROQ");
-const BACKEND_VERSION = 'v23';
+const BACKEND_VERSION = 'v24';
 // Todas las claves de Groq configuradas, sin repetir y en orden (la principal primero).
 function groqKeys_() {
   const out = [];
@@ -371,8 +378,32 @@ function usrSave_(list) { usrCache_ = list; PropertiesService.getScriptPropertie
 function usrByCode_(code) {
   const c = proNorm(code);
   if (!c) return null;
-  return usrLoad_().filter(function (r) { return !r.revoked && proNorm(r.code) === c; })[0] || null;
+  return usrLoad_().filter(function (r) { return !r.revoked && !usrVencido_(r) && proNorm(r.code) === c; })[0] || null;
 }
+// v24: vencimiento y permisos
+function usrVencido_(r) { return Number(r.expiresAt) > 0 && Number(r.expiresAt) <= Date.now(); }
+const PERMS_TODOS = { ver: true, chat: true, msgs: true, ia: true };
+function usrPerms_(r) {
+  const p = Object.assign({}, PERMS_TODOS, (r && r.perms) || {});
+  if (r && !r.perms && r.share === false) p.ver = false;      // personas creadas en v23
+  Object.keys(PERMS_TODOS).forEach(function (k) { p[k] = p[k] !== false && p[k] !== 'false'; });
+  return p;
+}
+function permsIn_(x, base) {
+  const p = Object.assign({}, base || PERMS_TODOS);
+  if (x && typeof x === 'object') Object.keys(PERMS_TODOS).forEach(function (k) { if (k in x) p[k] = x[k] !== false && x[k] !== 'false'; });
+  return p;
+}
+// ¿Esta persona (la que llama desde su app) tiene el permiso? Ella, prueba y Jaider: siempre.
+function puede_(body, role, k) {
+  if (role === 'admin') return true;
+  const r = usrByCode_(body.code);
+  return !r || usrPerms_(r)[k];
+}
+// Desde la app de Jaider: ¿la persona elegida tiene el permiso?
+function puedeDestino_(uid, k) { const r = usrById_(uid); return !r || usrPerms_(r)[k]; }
+const NO_PERM = { chat: 'El chat no está activado para ti.', msgs: 'Los mensajes no están activados.', ia: 'La IA y la copia en la nube no están activadas para ti. Pídeselo a Jaider.', ver: 'Jaider no tiene registros compartidos contigo.' };
+function exigir_(body, role, k) { if (!puede_(body, role, k)) throw new Error(NO_PERM[k]); }
 function usrById_(id) {
   id = String(id || '');
   if (!id || USR_RESERVADOS[id]) return null;
@@ -389,7 +420,9 @@ function usrNewCode_(list) {
   throw new Error('No se pudo generar un código');
 }
 function usrPublic_(x) {
-  return { id: x.id, name: x.name, code: x.code, createdAt: x.createdAt || 0, revoked: !!x.revoked, share: x.share !== false,
+  const p = usrPerms_(x);
+  return { id: x.id, name: x.name, code: x.code, createdAt: x.createdAt || 0, revoked: !!x.revoked, share: p.ver,
+    app: x.app === 'libre' ? 'libre' : 'ella', perms: p, expiresAt: Number(x.expiresAt) || 0, expired: usrVencido_(x),
     lastUse: x.lastUse || 0, lastSync: x.lastSync || 0 };
 }
 function usrTouch_(id, fields) {
@@ -598,6 +631,9 @@ function chatWho(body, role) {
 }
 // v23: el chat de Ella y el de prueba siguen en la carpeta de siempre; el de otra persona, en la suya.
 function chatFolder_(w, folder, body) { return space_(w.thread, folder, body).folder; }
+// v24: ¿hay chat con esta persona? (lo revisan las dos puntas)
+function chatOn_(w) { return puedeDestino_(w.thread, 'chat'); }
+function chatExigir_(w) { if (!chatOn_(w)) throw new Error(w.side === 'jaider' ? usrName_(w.thread) + ' no tiene el chat activado.' : NO_PERM.chat); }
 
 function chatUnread(t, side) {
   const seen = Number(t.read[side]) || 0;
@@ -721,15 +757,25 @@ function proTouch(id, fields) {
 const ACTIONS = {
   verify_code: function (body) {
     const role = roleOf(body.code);
-    if (!role) return { ok: false, error: 'Código inválido' };
+    if (!role) {
+      const c = proNorm(body.code), x = c && usrLoad_().filter(function (r) { return proNorm(r.code) === c; })[0];
+      if (x && x.revoked) return { ok: false, error: 'Este código fue desactivado. Pídele uno nuevo a Jaider.' };
+      if (x && usrVencido_(x)) return { ok: false, error: 'Tu código venció. Pídele a Jaider que lo renueve.' };
+      return { ok: false, error: 'Código inválido' };
+    }
     const out = Object.assign({ ok: true, role: role, user: userOf(body, role) }, infoClaves_());
     const r = role !== 'admin' && usrByCode_(body.code);
-    if (r) { out.name = r.name; out.share = r.share !== false; usrTouch_(r.id, { lastUse: Date.now() }); }
+    if (r) {
+      const p = usrPerms_(r);
+      Object.assign(out, { name: r.name, share: p.ver, perms: p, app: r.app === 'libre' ? 'libre' : 'ella', expiresAt: Number(r.expiresAt) || 0 });
+      usrTouch_(r.id, { lastUse: Date.now() });
+    } else if (role !== 'admin' || fromHerApp(body)) out.perms = Object.assign({}, PERMS_TODOS);
     return out;
   },
 
   // v19: la app manda la consulta y el servidor la hace con sus claves (nunca salen de aquí).
   ai: function (body) {
+    if (body.code) exigir_(body, roleOf(body.code), 'ia');
     const quien = aiQuien_(body);
     const payload = aiValidar_(body.req);
     aiLimite_(quien);
@@ -744,6 +790,7 @@ const ACTIONS = {
 
   sync_her_data: function (body, folder) {
     const role = requireRole(body, 'any');
+    exigir_(body, role, 'ia');
     const sp = spaceOf(body, role, folder), u = sp.cfg;
     if (body.payload == null) throw new Error('Falta payload');
     const content = toContent(body.payload);
@@ -761,6 +808,7 @@ const ACTIONS = {
   // Jaider lo revisa desde su app; Ella lo usa para restaurar su respaldo si cambia de teléfono.
   get_her_data: function (body, folder) {
     const role = requireRole(body, 'any');
+    exigir_(body, role, 'ia');
     const sp = spaceOf(body, role, folder), u = sp.cfg;
     const f = newestFile(sp.folder, [u.file].concat(u.legacy));
     if (!f) return { ok: false, error: sp.uid === 'prueba' ? 'Aún no hay respaldo de prueba.' : sp.rec ? sp.rec.name + ' aún no ha sincronizado su progreso.' : 'Ella aún no ha sincronizado su progreso.' };
@@ -776,7 +824,7 @@ const ACTIONS = {
 
   get_my_data: function (body, folder) {
     const role = requireRole(body, 'any');
-    if (role !== 'admin') { const r = usrByCode_(body.code); if (r && r.share === false) return { ok: false, error: 'Jaider no tiene registros compartidos contigo.' }; }
+    if (!puede_(body, role, 'ver')) return { ok: false, error: NO_PERM.ver };
     const f = newestFile(folder, [MY_FILE].concat(MY_LEGACY_FILES));
     if (!f) return { ok: false, error: 'Jaider aún no tiene registros compartidos.' };
     const full = readJsonFile(f);
@@ -789,7 +837,8 @@ const ACTIONS = {
 
   send_message: function (body, folder) {
     requireRole(body, 'admin');
-    folder = spaceOf(body, 'admin', folder).folder;
+    const sp0 = spaceOf(body, 'admin', folder); folder = sp0.folder;
+    if (!puedeDestino_(sp0.uid, 'msgs')) throw new Error(usrName_(sp0.uid) + ' no tiene activados los mensajes y rutinas.');
     const text = String(body.text || '').trim().slice(0, MAX_TEXTO_MENSAJE);
     if (!text) throw new Error('El mensaje está vacío');
     const msg = {
@@ -810,6 +859,7 @@ const ACTIONS = {
 
   get_messages: function (body, folder) {
     const role = requireRole(body, 'any');
+    if (!puede_(body, role, 'msgs')) return { ok: true, off: true, pending: 0, messages: [] };
     const sp = spaceOf(body, role, folder); folder = sp.folder;
     const tester = sp.uid === 'prueba';
     let all = loadMessages(folder);
@@ -883,7 +933,8 @@ const ACTIONS = {
 
   send_routine: function (body, folder) {
     requireRole(body, 'admin');
-    folder = spaceOf(body, 'admin', folder).folder;
+    const sp0 = spaceOf(body, 'admin', folder); folder = sp0.folder;
+    if (!puedeDestino_(sp0.uid, 'msgs')) throw new Error(usrName_(sp0.uid) + ' no tiene activados los mensajes y rutinas.');
     const r = body.routine || {};
     const items = (Array.isArray(r.items) ? r.items : []).map(String).map(function (x) { return x.trim().slice(0, 70); }).filter(String).slice(0, 20);
     if (!items.length) throw new Error('La rutina no tiene ejercicios');
@@ -912,6 +963,7 @@ const ACTIONS = {
 
   get_routines: function (body, folder) {
     const role = requireRole(body, 'any');
+    if (!puede_(body, role, 'msgs')) return { ok: true, off: true, routines: [] };
     const sp = spaceOf(body, role, folder); folder = sp.folder;
     const tester = sp.uid === 'prueba';
     const f = findFile(folder, ROUTINE_FILE);
@@ -1034,7 +1086,8 @@ const ACTIONS = {
   },
 
   backup_photo: function (body, folder) {
-    const sp = spaceOf(body, requireRole(body, 'any'), folder), u = sp.cfg; folder = sp.folder;
+    const role0 = requireRole(body, 'any'); exigir_(body, role0, 'ia');
+    const sp = spaceOf(body, role0, folder), u = sp.cfg; folder = sp.folder;
     const id = String(body.id || '').replace(/[^a-zA-Z0-9_-]/g, '').slice(0, 40);
     const date = String(body.date || '').replace(/[^0-9-]/g, '').slice(0, 10);
     const m = String(body.dataUrl || '').match(/^data:(image\/(?:jpeg|png|webp));base64,(.+)$/);
@@ -1085,6 +1138,7 @@ const ACTIONS = {
 
   chat_send: function (body, folder) {
     const w = chatWho(body, requireRole(body, 'any'));
+    chatExigir_(w);
     folder = chatFolder_(w, folder, body);
     const text = String(body.text || '').trim().slice(0, MAX_TEXTO_CHAT);
     const id = String(body.id || Utilities.getUuid()).replace(/[^a-zA-Z0-9_-]/g, '').slice(0, 64) || Utilities.getUuid();
@@ -1138,6 +1192,7 @@ const ACTIONS = {
 
   chat_media: function (body, folder) {
     const w = chatWho(body, requireRole(body, 'any'));
+    chatExigir_(w);
     folder = chatFolder_(w, folder, body);
     const id = String(body.id || '');
     let out = null, err = '';
@@ -1161,6 +1216,7 @@ const ACTIONS = {
 
   chat_list: function (body, folder) {
     const w = chatWho(body, requireRole(body, 'any'));
+    if (!chatOn_(w)) return { ok: true, off: true, thread: w.thread, me: w.side, messages: [], unread: 0, readByOther: 0, readByMe: 0, rev: '' };
     const pres = chatPresence_(w);
     // v20: si la app ya tiene la última revisión, no se abre Drive
     const rev = chatRev_();
@@ -1229,12 +1285,14 @@ const ACTIONS = {
   // v20: "escribiendo…" (solo caché, no toca Drive)
   chat_typing: function (body) {
     const w = chatWho(body, requireRole(body, 'any'));
+    if (!chatOn_(w)) return { ok: true, off: true };
     try { chatCache_().put(chatPresKey_('typ', w.thread, w.side), String(Date.now()), 30); } catch (e) { }
     return { ok: true };
   },
 
   chat_read: function (body, folder) {
     const w = chatWho(body, requireRole(body, 'any'));
+    chatExigir_(w);
     folder = chatFolder_(w, folder, body);
     let at = 0;
     withLock(function () {
@@ -1351,7 +1409,10 @@ const ACTIONS = {
       if (list.length >= USR_MAX) throw new Error('Ya hay ' + USR_MAX + ' personas: borra alguna primero');
       let id;
       do { id = 'u' + Utilities.getUuid().replace(/-/g, '').slice(0, 9); } while (list.some(function (r) { return r.id === id; }));
-      rec = { id: id, name: name, code: usrNewCode_(list), createdAt: Date.now(), revoked: false, share: body.share !== false && body.share !== 'false', lastUse: 0, lastSync: 0 };
+      const perms = permsIn_(body.perms, Object.assign({}, PERMS_TODOS, { ver: body.share !== false && body.share !== 'false' }));
+      const dias = Math.max(0, Math.min(PRO_MAX_DIAS, Math.round(Number(body.days) || 0)));
+      rec = { id: id, name: name, code: usrNewCode_(list), createdAt: Date.now(), revoked: false, app: body.app === 'libre' ? 'libre' : 'ella',
+        perms: perms, share: perms.ver, expiresAt: dias ? Date.now() + dias * 86400000 : 0, lastUse: 0, lastSync: 0 };
       list.push(rec);
       usrSave_(list);
     });
@@ -1375,8 +1436,13 @@ const ACTIONS = {
         if (name) r.name = name;
         if (body.revoke === true || body.revoke === 'true') r.revoked = true;
         if (body.revoke === false || body.revoke === 'false') r.revoked = false;
-        if (body.share === true || body.share === 'true') r.share = true;
-        if (body.share === false || body.share === 'false') r.share = false;
+        if (body.share === true || body.share === 'true') { r.perms = Object.assign(usrPerms_(r), { ver: true }); r.share = true; }
+        if (body.share === false || body.share === 'false') { r.perms = Object.assign(usrPerms_(r), { ver: false }); r.share = false; }
+        if (body.perms && typeof body.perms === 'object') { r.perms = permsIn_(body.perms, usrPerms_(r)); r.share = r.perms.ver; }
+        if (body.app === 'ella' || body.app === 'libre') r.app = body.app;
+        const d = Math.max(0, Math.min(PRO_MAX_DIAS, Math.round(Number(body.days) || 0)));
+        if (d) r.expiresAt = Math.max(Date.now(), Number(r.expiresAt) || 0) + d * 86400000;
+        if (body.noExpire === true || body.noExpire === 'true') r.expiresAt = 0;
         if (body.newCode === true || body.newCode === 'true') r.code = usrNewCode_(list);
         found = r;
       });
@@ -1411,11 +1477,11 @@ const ACTIONS = {
     const items = [];
     if (fromHerApp(body)) {
       const sp = spaceOf(body, role, folder); folder = sp.folder;
-      const tester = sp.uid === 'prueba';
-      loadMessages(folder).map(tester ? viewAsTester : withoutTest).forEach(function (m) {
+      const tester = sp.uid === 'prueba', pm = puede_(body, role, 'msgs'), pc = puede_(body, role, 'chat');
+      (pm ? loadMessages(folder) : []).map(tester ? viewAsTester : withoutTest).forEach(function (m) {
         if (!m.read) items.push({ id: 'msg:' + m.id, title: '📩 Nuevo mensaje de Jaider', text: m.text, action: 'go:home' });
       });
-      const rf = findFile(folder, ROUTINE_FILE);
+      const rf = pm && findFile(folder, ROUTINE_FILE);
       ((rf && readJsonFile(rf).routines) || []).map(tester ? viewAsTester : withoutTest).forEach(function (r) {
         if (!r.imported) items.push({ id: 'rut:' + r.id, title: '📋 Jaider te mandó una rutina', text: r.title + (r.note ? ' · ' + r.note : ''), action: 'go:home' });
       });
@@ -1430,7 +1496,7 @@ const ACTIONS = {
         if (x.by !== 'jaider' || Date.now() - Number(x.at) > 36 * 3600000) return;
         items.push({ id: 'snk:' + x.id, title: '🥤 Jaider te sugirió un snack', text: x.t + (x.k ? ' · ~' + x.k + ' kcal' : ''), action: 'go:food' });
       });
-      chatUnread(chatThread(loadChat(folder), userOf(body, role)), 'ella').forEach(function (m) {
+      (pc ? chatUnread(chatThread(loadChat(folder), userOf(body, role)), 'ella') : []).forEach(function (m) {
         if (Date.now() - Number(m.ts) > 36 * 3600000) return;
         items.push({ id: 'chat:' + m.id, title: '💬 Jaider', text: chatMediaLabel(m), action: 'go:chat', button: 'Responder' });
       });
@@ -1499,7 +1565,7 @@ function notifPersona_(x, items) {
     if (q.status !== 'pendiente' || Number(q.createdAt || 0) < lim) return;
     items.push({ id: 'ped:' + q.id, title: '💡 ' + n + ' pidió un cambio para su app', text: q.text, action: go });
   });
-  chatUnread(chatThread(loadChat(f), x.id), 'jaider').forEach(function (m) {
+  (usrPerms_(x).chat ? chatUnread(chatThread(loadChat(f), x.id), 'jaider') : []).forEach(function (m) {
     if (Number(m.ts) < lim) return;
     items.push({ id: 'chat:' + m.id, title: '💬 ' + n, text: chatMediaLabel(m), action: 'go:chat:' + x.id, button: 'Responder' });
   });

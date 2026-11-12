@@ -15,7 +15,7 @@
   del último Release y podrían bajar la libre.
 - Toda la interfaz y la lógica están en `assets/index.html` dentro de cada APK.
 - No hay proyecto de Android Studio: se edita la APK publicada más reciente y se vuelve a firmar.
-- `fuente/MiProgreso_Backend.gs` (v23): el backend (Google Apps Script). Las claves NO están en el código: viven en las Propiedades del script (CODIGO_ELLA, CODIGO_ADMIN, GROQ_API_KEY).
+- `fuente/MiProgreso_Backend.gs` (v24): el backend (Google Apps Script). Las claves NO están en el código: viven en las Propiedades del script (CODIGO_ELLA, CODIGO_ADMIN, GROQ_API_KEY).
   Al hacer push de un cambio a este archivo, el workflow **Actualizar Apps Script** lo sube con clasp, actualiza la misma implementación (la URL no cambia) y comprueba `?action=health`.
 - `fuente/MsgPoll.java`: código nativo que hace las notificaciones con la app cerrada (ya está dentro de las APK como classes6.dex, y `Reminders.onReceive` lo llama).
 - `fuente/Pip.java` (8.5.10, en classes7.dex): ventana flotante. La página usa `NativeStore.savePhoto('__pip__', 'supported'|'enter:9:16'|'auto:1'|'auto:0'|'active')`
@@ -63,6 +63,23 @@
   Avisos con la app cerrada: `go:chat:<id>` y `go:persona:<id>`. Sin `user`, todo sigue siendo de Ella (apps viejas).
   Va antes de `initV7();`, después de v900, en el `index.html` de Jaider. Las funciones `mpPersona*` son declaradas
   (no `const`) para que v850/v890 las usen con `typeof mpPersona==='function'`.
+- **8.5.22 / backend v24 — app y permisos por persona.** Al crear una persona (👥 Personas) se elige `app`: `'ella'`
+  (la rosa) o `'libre'` (la pública), `perms {ver, chat, msgs, ia}` (ver = entrenos de Jaider; msgs = mensajes y rutinas;
+  ia = IA + copia en la nube, sin ella Jaider no ve su progreso) y `expiresAt` (opcional, `days` al crear/alargar,
+  `noExpire`). `verify_code` devuelve `perms`, `app` y `expiresAt`; el servidor hace cumplir los permisos (listas vacías
+  con `off:true` en `get_messages`, `get_routines`, `chat_list`; error claro en el resto). Personas de v23 sin `perms`:
+  todo activo salvo `ver` si tenían `share:false`. Los códigos nuevos solo se crean en Personas; la sección de Pro quedó
+  como "Códigos Pro antiguos" (siguen funcionando).
+  - App libre (`publica.js`): un código `PE-` se escribe donde el código Pro. Se guarda en `mp_pro_v1` con `persona:true`
+    y habla como la app de Ella (`code` + `app:'ella'`): `pro_verify/pro_sync/pro_get` se convierten en
+    `verify_code/sync_her_data/get_her_data`. `publica.js` define `herGas/herCode/herUrl/kvGet/pubConectada` (declaradas,
+    sin usar sus const) y v850 pone `V85_ELLA=true` si la libre está conectada: así el chat funciona igual que en la de Ella
+    (al conectarse la app se recarga una vez). Mensajes (tarjeta en Inicio con reacciones), rutinas (se importan como
+    `jr_<id>` y `ack_routine`) y "🧔 Entrenos de Jaider" (`get_my_data`) según permisos. Avisos con la app cerrada:
+    `pubPollBody()`, que usa la lista de recordatorios del index de Jaider (y por eso de la libre).
+  - App rosa: `fuente/v920_permisos_ella.js` (**solo Ella**, después de v890): guarda `app_perms`, esconde el chat, no
+    pregunta por la nube ni por ver a Jaider si no los tiene y avisa si Jaider cambió algo.
+  - Seguimiento (v900): sin snacks ni pedidos para personas de la app libre; chat solo si lo tiene.
 - `fuente/v890_snacks.js` (8.5.19, apps de **Jaider y Ella**; la libre lo trae apagado por `MP_PUBLICA`): editor de la
   lista de snacks de Ella, guardada en el servidor (`snacks_ella.json`, acciones `snacks_get` / `snacks_edit` con
   `op: add|upd|del|reset`, backend v21; usuario `ella` o `prueba` como el resto). Ella lo abre desde Comida → “✏️ Mi lista”;
