@@ -80,6 +80,15 @@
   - App rosa: `fuente/v920_permisos_ella.js` (**solo Ella**, después de v890): guarda `app_perms`, esconde el chat, no
     pregunta por la nube ni por ver a Jaider si no los tiene y avisa si Jaider cambió algo.
   - Seguimiento (v900): sin snacks ni pedidos para personas de la app libre; chat solo si lo tiene.
+- `fuente/v930_comidas.js` (8.5.23, **las tres apps**): comidas por categorías, sugerencias y editar. Va al final, justo antes
+  de `initV7();` (después de todos los demás) en los dos `index.html`; la libre lo hereda. Categoría por palabras clave
+  (`V93_KW`, gana la palabra que aparece primero) o la que elija la persona (`data.foodCats[clave]`); la clave es el nombre
+  sin tildes/mayúsculas. La lista de alimentos sale de `data.meals` (items o el texto separado por comas) + `data.foodItems`;
+  `data.foodHidden` = quitados de sugerencias. Al escribir sugiere (`v93Suggest`) y al agregar uno igual (sin plural/tildes)
+  usa el existente; si es casi igual (1–2 letras) pregunta con `confirm`. "✏️ Mis alimentos" (`v93OpenManager`): categoría,
+  renombrar/unir (también corrige `items`/`text` de las comidas guardadas) y quitar. ✏️ en cada comida: en la de chips carga
+  `fSel` con `editId`; en la de Ella llena `#mealText` (estado en `v93Edit`); «Guardar cambios» reemplaza la misma comida
+  (puede cambiar tipo y fecha). Las comidas fijas conservan su prefijo "Nombre: ".
 - `fuente/v890_snacks.js` (8.5.19, apps de **Jaider y Ella**; la libre lo trae apagado por `MP_PUBLICA`): editor de la
   lista de snacks de Ella, guardada en el servidor (`snacks_ella.json`, acciones `snacks_get` / `snacks_edit` con
   `op: add|upd|del|reset`, backend v21; usuario `ella` o `prueba` como el resto). Ella lo abre desde Comida → “✏️ Mi lista”;

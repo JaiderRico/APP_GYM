@@ -54,6 +54,15 @@
   // a: j = Mi Progreso (Jaider), e = Ella, l = Libre. Al publicar una versión, agrega arriba su entrada.
   const V88_APP=(typeof MP_PUBLICA!=='undefined'&&MP_PUBLICA)?'l':(MP_APK_IS_ELLA?'e':'j');
   const V88_NOV=[
+    {v:'8.5.23',f:'2026-11-15',i:[
+      ['j','🗂 Comida: tus alimentos ahora se ven por categorías (🥩 proteínas, 🍚 harinas, 🍎 frutas, 🥤 bebidas…). ⭐ Frecuentes muestra lo que más comes en esa comida.'],
+      ['j','🔎 Al escribir un alimento te sugiere los que ya tienes (aunque escribas sin tilde, en plural o con otra mayúscula). Si escribes uno casi igual a otro, te pregunta si es el mismo para no repetirlo.'],
+      ['j','✏️ Cada comida guardada tiene botón de editar: se carga en el formulario, la corriges (alimentos, tipo, fecha, proteína y calorías) y se reemplaza sin borrarla.'],
+      ['j','🗂 ✏️ Mis alimentos: cambia la categoría de cada alimento, corrige su nombre, une los repetidos (también en tus comidas guardadas) o quítalo de las sugerencias.'],
+      ['e','🔎 Al escribir lo que comiste te sugiere lo que ya has registrado, y si escribes algo casi igual a otro te pregunta si es lo mismo.'],
+      ['e','🗂 Debajo del campo está «Tus alimentos por categoría»: tócalos para agregarlos sin escribir. En ✏️ Mis alimentos cambias categorías, corriges nombres o unes repetidos.'],
+      ['e','✏️ Cada comida guardada tiene botón de editar: la corriges y se reemplaza, sin tener que borrarla.'],
+      ['l','🗂 Comida: tus alimentos por categorías, sugerencias mientras escribes (sin repetir alimentos) y botón ✏️ para editar cualquier comida guardada.']]},
     {v:'8.5.22',f:'2026-11-12',i:[
       ['j','👥 Al crear una persona eliges su app (👩 rosa o 🧔 libre), qué puede usar (ver tus entrenos, chat, mensajes y rutinas, IA y copia en la nube) y si el código vence. Todo se cambia después tocando cada permiso.'],
       ['j','✦ Los códigos nuevos se crean solo en 👥 Personas; los códigos Pro que ya tenías siguen funcionando.'],

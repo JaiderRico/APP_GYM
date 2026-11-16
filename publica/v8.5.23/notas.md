@@ -1,0 +1,4 @@
+- Comida: alimentos por categorías (Frecuentes, Proteínas, Harinas, Frutas, Bebidas…)
+- Sugerencias al escribir un alimento y aviso si ya existe uno casi igual (no se repiten)
+- Botón ✏️ para editar cualquier comida guardada (alimentos, tipo, fecha, proteína y calorías)
+- Mis alimentos: cambiar categoría, renombrar, unir repetidos o quitar de la lista
