@@ -1,0 +1,6 @@
+- 📈 Plan de hipertrofia basado en estudios (Lun Pierna A · Mar Push · Mié Pull · Jue descanso · Vie Pierna B · Sáb Torso · Dom Hombros + brazos). Se aplica desde Resumen y se puede deshacer
+- 🎯 Guía de esfuerzo (RIR) en cada serie y avisos si llevas un compuesto al fallo o pierdes muchas repeticiones
+- 📚 Evidencia por ejercicio y sustituciones ordenadas por respaldo
+- ▶ Animación «Cómo se hace» para cada ejercicio
+- 🎨 Temas de color en Ajustes
+- 🌙 Descarga solo con fatiga alta y estancamiento

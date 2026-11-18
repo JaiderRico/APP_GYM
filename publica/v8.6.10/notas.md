@@ -1,0 +1,2 @@
+- ▶ Animación «Cómo se hace» para cada ejercicio
+- 🎨 Temas de color en Ajustes

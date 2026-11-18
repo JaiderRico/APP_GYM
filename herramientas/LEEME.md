@@ -95,6 +95,13 @@
   No bloquea con un entreno en curso. (2) Creatina: 10 recordatorios nativos `v94_crea_HHMM` (19:00–23:30, `repeat` diario)
   con acción `go:creatina` (ventana `#v94Cr`: tomada o motivo en `data.creatineSkip[fecha]`); resuelta hoy → pasan a mañana.
   Va al final, justo antes de `initV7();` (después de v930) en el `index.html` de Jaider.
+- `fuente/v8610_hipertrofia.js` (8.6.10, **app de Jaider**; la libre lo hereda con el plan apagado porque `HYP_ON` solo es
+  verdadero si `V88_APP==='j'`): (1) animaciones SVG `HYA` de los ejercicios (botón «▶ Cómo se hace»; también en la libre);
+  (2) plan de hipertrofia `HYP_PLAN` (Lun Pierna A · Mar Push · Mié Pull · Jue descanso · Vie Pierna B · Sáb Torso · Dom
+  Hombros+brazos), se aplica con botón y guarda copia en `data.settings.hypPlan` para deshacer; `HYP_ORIG` + `hypSyncBuiltins`
+  sincronizan `BUILTIN_ROUTINES`; guía RIR por serie y avisos (`hypAfterSet`), evidencia `HYP_EV`/`HYP_S`; (3) temas de
+  color `HYP_THEMES` (`data.settings.hypTheme`, Esmeralda = original). Va al final, justo antes de `initV7();` (después de
+  v940). Fuera del bloque: `drawChart` y la gráfica de progreso usan `var(--hyp-chart)` para seguir el tema.
 - `fuente/v890_snacks.js` (8.5.19, apps de **Jaider y Ella**; la libre lo trae apagado por `MP_PUBLICA`): editor de la
   lista de snacks de Ella, guardada en el servidor (`snacks_ella.json`, acciones `snacks_get` / `snacks_edit` con
   `op: add|upd|del|reset`, backend v21; usuario `ella` o `prueba` como el resto). Ella lo abre desde Comida → “✏️ Mi lista”;
