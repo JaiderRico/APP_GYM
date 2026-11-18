@@ -1,0 +1,2 @@
+- 🔒 Si ayer no registraste desayuno, almuerzo o cena, la app se bloquea hasta que lo anotes (o marques 'No la hice')
+- 💊 Creatina: si a las 7 pm no está marcada, avisos cada 30 min hasta las 11:30 pm, hasta marcarla o decir por qué no

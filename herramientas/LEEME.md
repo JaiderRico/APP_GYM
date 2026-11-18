@@ -89,6 +89,12 @@
   renombrar/unir (también corrige `items`/`text` de las comidas guardadas) y quitar. ✏️ en cada comida: en la de chips carga
   `fSel` con `editId`; en la de Ella llena `#mealText` (estado en `v93Edit`); «Guardar cambios» reemplaza la misma comida
   (puede cambiar tipo y fecha). Las comidas fijas conservan su prefijo "Nombre: ".
+- `fuente/v940_bloqueos.js` (8.5.24, **solo app de Jaider**; la libre lo hereda apagado por `MP_PUBLICA`, `V94_ON`): (1) si ayer
+  falta desayuno, almuerzo o cena (y ayer ≥ `data.settings.v94.since`, que se fija el primer día), una capa `#v94Lock` tapa la
+  app y `go` solo deja ir a Comida (con barra `#v94Bar`) hasta registrarlas o marcar "No la hice" (`data.mealSkips[fecha]`).
+  No bloquea con un entreno en curso. (2) Creatina: 10 recordatorios nativos `v94_crea_HHMM` (19:00–23:30, `repeat` diario)
+  con acción `go:creatina` (ventana `#v94Cr`: tomada o motivo en `data.creatineSkip[fecha]`); resuelta hoy → pasan a mañana.
+  Va al final, justo antes de `initV7();` (después de v930) en el `index.html` de Jaider.
 - `fuente/v890_snacks.js` (8.5.19, apps de **Jaider y Ella**; la libre lo trae apagado por `MP_PUBLICA`): editor de la
   lista de snacks de Ella, guardada en el servidor (`snacks_ella.json`, acciones `snacks_get` / `snacks_edit` con
   `op: add|upd|del|reset`, backend v21; usuario `ella` o `prueba` como el resto). Ella lo abre desde Comida → “✏️ Mi lista”;

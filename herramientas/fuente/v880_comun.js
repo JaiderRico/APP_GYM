@@ -54,6 +54,10 @@
   // a: j = Mi Progreso (Jaider), e = Ella, l = Libre. Al publicar una versión, agrega arriba su entrada.
   const V88_APP=(typeof MP_PUBLICA!=='undefined'&&MP_PUBLICA)?'l':(MP_APK_IS_ELLA?'e':'j');
   const V88_NOV=[
+    {v:'8.5.24',f:'2026-11-17',i:[
+      ['j','🔒 Si un día no registras desayuno, almuerzo o cena, al día siguiente la app se bloquea hasta que anotes lo que faltó (o marques "No la hice" si de verdad no la comiste).'],
+      ['j','💊 Si a las 7 pm no has marcado la creatina, te llegan avisos cada 30 minutos hasta las 11:30 pm. Paran cuando la marcas como tomada o cuando dices por qué no te la vas a tomar.'],
+    ]},
     {v:'8.5.23',f:'2026-11-15',i:[
       ['j','🗂 Comida: tus alimentos ahora se ven por categorías (🥩 proteínas, 🍚 harinas, 🍎 frutas, 🥤 bebidas…). ⭐ Frecuentes muestra lo que más comes en esa comida.'],
       ['j','🔎 Al escribir un alimento te sugiere los que ya tienes (aunque escribas sin tilde, en plural o con otra mayúscula). Si escribes uno casi igual a otro, te pregunta si es el mismo para no repetirlo.'],
