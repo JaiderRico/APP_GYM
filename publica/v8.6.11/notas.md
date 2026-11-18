@@ -1,0 +1,3 @@
+- ⚙ Ajustes en pestañas
+- 🎨 Temas nuevos que cambian toda la app, oscuros y claros
+- 🧪 Simulador de entrenamiento: entrena de prueba sin guardar nada

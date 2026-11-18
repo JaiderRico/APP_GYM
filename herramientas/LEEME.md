@@ -102,6 +102,17 @@
   sincronizan `BUILTIN_ROUTINES`; guía RIR por serie y avisos (`hypAfterSet`), evidencia `HYP_EV`/`HYP_S`; (3) temas de
   color `HYP_THEMES` (`data.settings.hypTheme`, Esmeralda = original). Va al final, justo antes de `initV7();` (después de
   v940). Fuera del bloque: `drawChart` y la gráfica de progreso usan `var(--hyp-chart)` para seguir el tema.
+  Desde 8.6.11 los temas son completos (`HYP_THEMES` con bg/panel/panel2/line/muted/text/green/green2/ink, oscuros y
+  claros, y `{id:'custom',hue,base:'dark'|'black'|'light'}`): además de las variables, `hypRemap` traduce en el CSSOM
+  los colores fijos de las reglas (grises → escala del tema por luminosidad, verdes → acento, otros tonos se oscurecen en
+  temas claros; sombras/velos negros con alfa < .75 quedan igual) y guarda los originales para volver a «Original».
+  Cada estudio de `HYP_S` tiene certeza en `HYP_CERT` (alta/media/baja), que se ve como un punto de color en la cita.
+- `fuente/v8611_ajustes_simulador.js` (8.6.11; va justo antes de `initV7();`, después de v8610): (1) descansos propios
+  `data.settings.restCustom[nombre]=seg` (envuelve `restRule`; lo elegido manda sobre el mínimo), con un selector en el plan
+  (`hypRestSel`); (2) «Progreso de Ella» escondido en la app de Jaider (`body.mp-noher`; `data.settings.showHer=true` lo
+  muestra, en Ajustes → Personas); (3) Ajustes en pestañas (`#stgTabs`; cada bloque se clasifica por su título con
+  `V8611_TABS`; si algo abre un bloque de otra pestaña, cambia sola); (4) Simulador: `localStorage` en memoria,
+  `nativeSave`/`saveBackupVersion` sin efecto, sin Apps Script, descansos de 10 s opcionales; salir = `location.reload()`.
 - `fuente/v890_snacks.js` (8.5.19, apps de **Jaider y Ella**; la libre lo trae apagado por `MP_PUBLICA`): editor de la
   lista de snacks de Ella, guardada en el servidor (`snacks_ella.json`, acciones `snacks_get` / `snacks_edit` con
   `op: add|upd|del|reset`, backend v21; usuario `ella` o `prueba` como el resto). Ella lo abre desde Comida → “✏️ Mi lista”;

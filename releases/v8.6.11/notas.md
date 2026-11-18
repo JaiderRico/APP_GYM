@@ -1,0 +1,6 @@
+- ⏱ Descansos a tu medida: en el plan eliges el descanso de cada ejercicio (tus 3 min siguen como base)
+- 📚 Cada estudio dice su certeza (alta, media o baja)
+- 👩 «Progreso de Ella» fuera de Inicio e Historial (se reactiva en Ajustes → Personas)
+- ⚙ Ajustes en pestañas: Entreno, Apariencia, Avisos, Datos, Personas e Info
+- 🎨 Temas nuevos que cambian toda la app, oscuros y claros, más uno personalizado
+- 🧪 Simulador de entrenamiento: entrena de prueba sin guardar nada

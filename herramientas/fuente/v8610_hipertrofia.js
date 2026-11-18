@@ -334,7 +334,9 @@
   }
 
   /* --- utilidades de presentación --- */
-  const hypCite=k=>{const s=HYP_S[k];return s?`<button type="button" class="hyp-cite" data-hyp-url="${esc(s[2])}" title="${esc(s[1])}">📄 ${esc(s[0])}</button>`:''};
+  const HYP_CERT={refalo23:'media',refalo24:'media',robinson24:'media',moran17:'media',pelland24:'alta',schoenfeld16:'baja',singer24:'baja',schoenfeld17:'alta',coleman24:'baja',haugen23:'media',larsen25lp:'baja',larsen24le:'baja',maeo21:'baja',maeo23:'baja',kinoshita23:'baja',kassiano25:'baja',larsen25lat:'baja',bourne17:'baja',plotkin23:'baja',wolf25:'baja',wolf23:'media',pec22:'baja'};
+  const HYP_CERT_TXT={alta:'Certeza alta: varios estudios o meta-análisis coinciden',media:'Certeza media: meta-análisis con pocos estudios o resultados que no siempre coinciden',baja:'Certeza baja: un solo estudio, preprint o medición indirecta'};
+  const hypCite=k=>{const s=HYP_S[k];if(!s)return '';const c=HYP_CERT[k]||'baja';return `<button type="button" class="hyp-cite" data-hyp-url="${esc(s[2])}" title="${esc(s[1]+' · '+HYP_CERT_TXT[c])}"><i class="hyp-cert ${c}"></i>📄 ${esc(s[0])}</button>`};
   const hypEvFor=name=>HYP_EV[name]||HYP_EV[String(name||'').replace(/ (con mancuernas|en máquina|en polea)$/,'')]||null;
   const hyaBtn=(name,cls='')=>`<button type="button" class="hya-btn ${cls}" data-hya="${esc(name)}">▶ Cómo se hace</button>`;
   function hypIsCompound(name){return COMPOUND_RE.test(name||'')||!!catalogEntry(name).warmup}
@@ -349,21 +351,21 @@
   function hypRenderModal(){
     const host=$('#hypModalBody');if(!host)return;const on=hypOn();
     const pr=(t,ks)=>`<li>${t}<div>${ks.map(hypCite).join('')}</div></li>`;
-    const days=Object.entries(HYP_PLAN).map(([d,r])=>`<details class="hyp-day" ${String(dayOf(today()))===d?'open':''}><summary><b>${esc(r.title)}</b>${r.items.length?` <span class="small">· ${r.items.length} ejercicios</span>`:''}</summary>${r.items.length?r.items.map(n=>{const p=r.prescription[n],ev=hypEvFor(n);return `<div class="hyp-ex"><div class="row between" style="gap:8px;align-items:flex-start"><div><b>${esc(n)}</b><div class="small">${p.sets} × ${esc(p.reps)} · RIR ${esc(p.rir)}</div></div>${hyaBtn(n,'mini')}</div>${ev?`<div class="small hyp-why">${esc(ev[0])}</div><div>${ev[1].map(hypCite).join('')}</div>`:''}</div>`}).join(''):'<p class="small">Descanso: el músculo crece mientras te recuperas.</p>'}</details>`).join('');
+    const days=Object.entries(HYP_PLAN).map(([d,r])=>`<details class="hyp-day" ${String(dayOf(today()))===d?'open':''}><summary><b>${esc(r.title)}</b>${r.items.length?` <span class="small">· ${r.items.length} ejercicios</span>`:''}</summary>${r.items.length?r.items.map(n=>{const p=r.prescription[n],ev=hypEvFor(n);return `<div class="hyp-ex"><div class="row between" style="gap:8px;align-items:flex-start"><div><b>${esc(n)}</b><div class="small">${p.sets} × ${esc(p.reps)} · RIR ${esc(p.rir)}</div><label class="hyp-rest small">⏱ Descanso ${hypRestSel(n,p.rest)}</label></div>${hyaBtn(n,'mini')}</div>${ev?`<div class="small hyp-why">${esc(ev[0])}</div><div>${ev[1].map(hypCite).join('')}</div>`:''}</div>`}).join(''):'<p class="small">Descanso: el músculo crece mientras te recuperas.</p>'}</details>`).join('');
     host.innerHTML=`${HYP_ON?`<div class="hyp-status ${on?'on':''}">${on?`✅ Plan activo desde el ${esc(dateLabel(data.settings.hypPlan.applied))}.`:'El plan aún no está aplicado: tus rutinas actuales siguen igual.'}<div class="row" style="gap:8px;margin-top:8px">${on?'<button class="secondary" data-hyp-undo>↩ Volver a mis rutinas anteriores</button>':'<button class="primary" data-hyp-apply>Aplicar plan</button>'}</div></div>`:''}
 <h3 class="hyp-h">Cómo entrenar</h3><ul class="hyp-pr">
 ${pr('<b>Esfuerzo:</b> compuestos (prensa, rumano, press, jalón, remo) a RIR 1–2 en todas las series. Aislamiento a RIR 1 y solo la última serie al fallo. Crece igual y te recuperas antes.',['refalo23','refalo24','robinson24','moran17'])}
 ${pr('<b>Volumen:</b> ~10–16 series directas por músculo por semana, repartidas en 2 sesiones. Más series suman cada vez menos.',['pelland24'])}
 ${pr('<b>Repeticiones:</b> de 6 a 15 todas sirven si llegas cerca del fallo.',['schoenfeld17'])}
 ${pr('<b>Progresión doble:</b> cuando hagas el tope del rango en todas las series con el RIR indicado, sube el mínimo de carga. La app te lo propone en cada serie.',[])}
-${pr('<b>Descanso:</b> más de 90 s ya cubre lo que importa; la app mantiene 3 min (4 en prensa y rumano).',['schoenfeld16','singer24'])}
+${pr('<b>Descanso:</b> 3 min (4 en prensa y rumano) para recuperar el músculo y el sistema nervioso y no perder repeticiones en la siguiente serie. Lo que coinciden los estudios: menos de 60 s es peor; entre 90 s y 3 min la diferencia en crecimiento no está clara (pocos estudios y pequeños), así que no hay razón para bajarlo. Puedes cambiar el descanso de cada ejercicio abajo, en «Tu semana».',['schoenfeld16','singer24'])}
 ${pr('<b>Máquinas:</b> crecen igual que el peso libre y cansan menos. Si un ejercicio libre te estanca o fatiga, pásalo a máquina.',['haugen23'])}
 ${pr('<b>Parciales:</b> en la última serie de aislamiento puedes sumar repeticiones parciales en la parte estirada.',['wolf25','wolf23'])}
 ${pr('<b>Descarga:</b> solo cuando hay fatiga alta y estancamiento; programarla sin señales no da más músculo.',['coleman24'])}
 </ul>
 <h3 class="hyp-h">Tu semana</h3>${days}
 <h3 class="hyp-h">Si un ejercicio te fatiga demasiado</h3><ul class="hyp-pr">${HYP_SWAPS.map(([a,b,w])=>`<li><b>${esc(a)}</b> → <b>${esc(b)}</b> ${esc(w)} ${hyaBtn(b,'mini')}</li>`).join('')}</ul>
-<h3 class="hyp-h">Estudios</h3><ul class="hyp-pr hyp-studies">${Object.keys(HYP_S).map(k=>`<li>${hypCite(k)} <span class="small">${esc(HYP_S[k][1])}</span></li>`).join('')}</ul>
+<h3 class="hyp-h">Estudios</h3><p class="small" style="margin:0 0 8px">No todos pesan igual. El punto de color dice qué tan seguro es: <i class="hyp-cert alta"></i> alta (varios estudios coinciden) · <i class="hyp-cert media"></i> media · <i class="hyp-cert baja"></i> baja (un solo estudio o indirecto). Cuando uno de certeza baja choca con uno de certeza alta, manda el de alta.</p><ul class="hyp-pr hyp-studies">${['alta','media','baja'].map(c=>Object.keys(HYP_S).filter(k=>(HYP_CERT[k]||'baja')===c).map(k=>`<li>${hypCite(k)} <span class="small">${esc(HYP_S[k][1])} · <b>certeza ${c}</b></span></li>`).join('')).join('')}</ul>
 <p class="small">Si cambias de gimnasio según el día (Principal / U), revisa que los ejercicios de cada día existan allí.</p>`;
   }
   function hypOpenModal(){hypEnsureModals();hypRenderModal();openM('hypModal')}
@@ -469,34 +471,112 @@ ${pr('<b>Descarga:</b> solo cuando hay fatiga alta y estancamiento; programarla 
     aiAsk=function(o){try{if(o&&/entrenador|rutina|entreno/i.test(o.system||''))o={...o,system:(o.system||'')+HYP_AI}}catch{}return _aiHyp.call(this,o)};
   }
 
-  /* --- Colores de la app --- */
+  /* --- Colores de la app (8.6.11: temas completos — fondo, tarjetas, texto, bordes y acento) --- */
+  // Cada tema define toda la paleta. Los colores fijos del CSS (los que no usan variables) se traducen
+  // al vuelo: los grises se ubican en la escala del tema por su luminosidad y los verdes pasan al acento.
   const HYP_THEMES=[
-    {id:'esmeralda',name:'Esmeralda',bg:'#101512',panel:'#1a1d21',panel2:'#23272c',line:'#30353c',green:'#5fe08e',green2:'#a9f0c3'},
-    {id:'oceano',name:'Océano',bg:'#0d1218',panel:'#181d24',panel2:'#1f252d',line:'#2f3741',green:'#7cc4ff',green2:'#b9defe'},
-    {id:'turquesa',name:'Turquesa',bg:'#0c1515',panel:'#172021',panel2:'#1d2829',line:'#2c3b3c',green:'#5fe0d0',green2:'#a6efe6'},
-    {id:'lavanda',name:'Lavanda',bg:'#110f18',panel:'#1b1924',panel2:'#23202d',line:'#353141',green:'#b7a3ff',green2:'#d9cdff'},
-    {id:'rosa',name:'Rosa',bg:'#170f13',panel:'#221a1e',panel2:'#2a2126',line:'#3d3138',green:'#ff8db3',green2:'#ffc4d8'},
-    {id:'coral',name:'Coral',bg:'#160f0e',panel:'#211a19',panel2:'#2a2120',line:'#3d302e',green:'#ff8a7a',green2:'#ffc0b6'},
-    {id:'atardecer',name:'Atardecer',bg:'#15100d',panel:'#201b18',panel2:'#28221e',line:'#3a322c',green:'#ffb066',green2:'#ffd2a3'},
-    {id:'lima',name:'Lima',bg:'#11140c',panel:'#1c1e18',panel2:'#23261e',line:'#34382d',green:'#cdeb5e',green2:'#e5f6a8'},
+    {id:'esmeralda',name:'Original',bg:'#101512',panel:'#1b1c1f',panel2:'#222428',line:'#333539',muted:'#a4a7ac',text:'#eff5f2',green:'#76e7a5',green2:'#abf0c8',ink:'#0b120d'},
+    {id:'grafito',name:'Grafito',bg:'#0f1012',panel:'#1a1b1e',panel2:'#222327',line:'#323438',muted:'#a0a4aa',text:'#eef0f3',green:'#8ab4f8',green2:'#c3d7fb',ink:'#0b1324'},
+    {id:'medianoche',name:'Medianoche',bg:'#0a0f1e',panel:'#131a2d',panel2:'#1a2238',line:'#2a3452',muted:'#9aa4c4',text:'#eef1fb',green:'#7aa2ff',green2:'#bccdff',ink:'#08122e'},
+    {id:'ambar',name:'Carbón y ámbar',bg:'#0f0e0c',panel:'#1b1916',panel2:'#23201c',line:'#36312b',muted:'#aaa294',text:'#f4efe6',green:'#f2b45a',green2:'#f8d49c',ink:'#1c1305'},
+    {id:'vino',name:'Vino',bg:'#140c11',panel:'#21151c',panel2:'#291b23',line:'#3d2b35',muted:'#b59ca8',text:'#f7edf1',green:'#ff7aa2',green2:'#ffb7cc',ink:'#2b0815'},
+    {id:'bosque',name:'Bosque',bg:'#0a110d',panel:'#142019',panel2:'#1a281f',line:'#293c30',muted:'#9aaf9f',text:'#edf5ef',green:'#a6e36e',green2:'#d0f1b1',ink:'#0f1b05'},
+    {id:'lavanda',name:'Lavanda',bg:'#100e19',panel:'#1b1827',panel2:'#221e31',line:'#342f48',muted:'#a8a2c1',text:'#f2effb',green:'#b9a6ff',green2:'#dbd0ff',ink:'#170d33'},
+    {id:'oled',name:'Negro OLED',bg:'#000000',panel:'#0e0f10',panel2:'#161718',line:'#29292c',muted:'#a2a3a8',text:'#f5f5f7',green:'#5eead4',green2:'#a8f4e8',ink:'#00211c'},
+    {id:'claro',name:'Claro',light:true,bg:'#f3f5f4',panel:'#ffffff',panel2:'#eceff0',line:'#d6dcdb',muted:'#5d6a66',text:'#131916',green:'#13914c',green2:'#0d7038',ink:'#ffffff'},
+    {id:'nube',name:'Nube',light:true,bg:'#edf1f7',panel:'#ffffff',panel2:'#e5ebf4',line:'#d0d9e7',muted:'#596579',text:'#111827',green:'#2f6fe4',green2:'#1c4fb4',ink:'#ffffff'},
+    {id:'arena',name:'Arena',light:true,bg:'#f5efe6',panel:'#fffcf7',panel2:'#efe6d9',line:'#ded1bf',muted:'#6d6255',text:'#231c15',green:'#bf5530',green2:'#953f20',ink:'#ffffff'},
+    {id:'rosado',name:'Rosado',light:true,bg:'#fbf1f4',panel:'#ffffff',panel2:'#f6e6eb',line:'#ebd3db',muted:'#74606a',text:'#24161c',green:'#c93d6e',green2:'#9c2a53',ink:'#ffffff'},
   ];
-  function hypHueTheme(h){h=((Number(h)||0)%360+360)%360;return {id:'custom',name:'Personalizado',hue:h,bg:`hsl(${h} 22% 7%)`,panel:`hsl(${h} 9% 11.5%)`,panel2:`hsl(${h} 9% 14.5%)`,line:`hsl(${h} 8% 22%)`,green:`hsl(${h} 78% 72%)`,green2:`hsl(${h} 85% 85%)`}}
-  function hypThemeCur(){const t=data.settings?.hypTheme;if(!t)return HYP_THEMES[0];if(t.id==='custom')return hypHueTheme(t.hue);return HYP_THEMES.find(x=>x.id===t.id)||HYP_THEMES[0]}
-  function hypThemeApply(){
-    const raw=data.settings?.hypTheme,def=!raw||raw.id==='esmeralda',t=hypThemeCur(),r=document.documentElement.style,keys=['bg','panel','panel2','line','green','green2'];
-    document.documentElement.classList.toggle('hyp-themed',!def);
-    if(def){for(const k of keys)r.removeProperty('--'+k);r.removeProperty('--hyp-chart');r.removeProperty('--hyp-chart2')}
-    else{for(const k of keys)r.setProperty('--'+k,t[k]);r.setProperty('--hyp-chart',t.green);r.setProperty('--hyp-chart2',t.green2)}
-    try{document.querySelector('meta[name="theme-color"]')?.setAttribute('content',def?'#101512':(t.id==='custom'?'#101512':t.bg))}catch{}
+  const HYP_TH_KEYS=['bg','panel','panel2','line','muted','text','green','green2'];
+  function hypHsl(h,s,l){s/=100;l/=100;const k=n=>(n+h/30)%12,a=s*Math.min(l,1-l),f=n=>l-a*Math.max(-1,Math.min(k(n)-3,Math.min(9-k(n),1)));const x=v=>Math.round(v*255).toString(16).padStart(2,'0');return '#'+x(f(0))+x(f(8))+x(f(4))}
+  function hypHueTheme(h,base){
+    h=((Number(h)||0)%360+360)%360;base=base||'dark';
+    if(base==='light')return {id:'custom',name:'Personalizado',hue:h,base,light:true,bg:hypHsl(h,22,96),panel:'#ffffff',panel2:hypHsl(h,18,93),line:hypHsl(h,14,85),muted:hypHsl(h,8,38),text:hypHsl(h,20,9),green:hypHsl(h,68,40),green2:hypHsl(h,72,30),ink:'#ffffff'};
+    const blk=base==='black';
+    return {id:'custom',name:'Personalizado',hue:h,base,bg:blk?'#000000':hypHsl(h,24,6),panel:blk?hypHsl(h,6,6):hypHsl(h,12,10.5),panel2:blk?hypHsl(h,6,9):hypHsl(h,12,13.5),line:hypHsl(h,10,blk?17:21),muted:hypHsl(h,8,66),text:hypHsl(h,20,95),green:hypHsl(h,78,70),green2:hypHsl(h,85,84),ink:hypHsl(h,60,8)};
   }
+  function hypThemeCur(){const t=data.settings?.hypTheme;if(!t)return HYP_THEMES[0];if(t.id==='custom')return hypHueTheme(t.hue,t.base);return HYP_THEMES.find(x=>x.id===t.id)||HYP_THEMES[0]}
+
+  // --- traductor de colores fijos del CSS ---
+  const hypRx=/#[0-9a-fA-F]{3,8}\b|rgba?\([^)]*\)|hsla?\([^)]*\)/g;
+  function hypParse(s){
+    s=s.trim();let m;
+    if(s[0]==='#'){let h=s.slice(1);if(h.length===3||h.length===4)h=[...h].map(c=>c+c).join('');if(h.length!==6&&h.length!==8)return null;const n=i=>parseInt(h.slice(i,i+2),16);return {r:n(0),g:n(2),b:n(4),a:h.length===8?n(6)/255:1}}
+    if((m=s.match(/^rgba?\(([^)]*)\)$/i))){const p=m[1].split(/[\s,\/]+/).filter(Boolean);if(p.length<3)return null;const v=x=>/%$/.test(x)?parseFloat(x)*2.55:parseFloat(x);const a=p[3]===undefined?1:(/%$/.test(p[3])?parseFloat(p[3])/100:parseFloat(p[3]));return {r:v(p[0]),g:v(p[1]),b:v(p[2]),a}}
+    if((m=s.match(/^hsla?\(([^)]*)\)$/i))){const p=m[1].split(/[\s,\/]+/).filter(Boolean);if(p.length<3)return null;const c=hypParse(hypHsl(parseFloat(p[0]),parseFloat(p[1]),parseFloat(p[2])));if(!c)return null;c.a=p[3]===undefined?1:(/%$/.test(p[3])?parseFloat(p[3])/100:parseFloat(p[3]));return c}
+    return null;
+  }
+  function hypHslOf(c){const r=c.r/255,g=c.g/255,b=c.b/255,mx=Math.max(r,g,b),mn=Math.min(r,g,b),l=(mx+mn)/2,d=mx-mn;let h=0,s=0;if(d){s=d/(1-Math.abs(2*l-1));h=mx===r?((g-b)/d)%6:mx===g?(b-r)/d+2:(r-g)/d+4;h*=60;if(h<0)h+=360}return {h,s,l,ch:d}}
+  const hypMix=(a,b,k)=>({r:a.r+(b.r-a.r)*k,g:a.g+(b.g-a.g)*k,b:a.b+(b.b-a.b)*k,a:a.a});
+  const hypOut=c=>{const f=v=>Math.max(0,Math.min(255,Math.round(v)));const a=Math.round((c.a??1)*1000)/1000;return a>=1?`rgb(${f(c.r)},${f(c.g)},${f(c.b)})`:`rgba(${f(c.r)},${f(c.g)},${f(c.b)},${a})`};
+  function hypMapper(th){
+    const P=k=>hypParse(th[k]),bg=P('bg'),deep=th.light?hypMix(bg,{r:0,g:0,b:0,a:1},.06):hypMix(bg,{r:0,g:0,b:0,a:1},.35);
+    const ramp=[[0,deep],[7,bg],[11.5,P('panel')],[14.5,P('panel2')],[21,P('line')],[66,P('muted')],[95,P('text')],[100,P('text')]];
+    const acc=P('green'),acc2=P('green2'),ink=P('ink'),panel=P('panel'),cache=new Map();
+    const onRamp=L=>{for(let i=1;i<ramp.length;i++){const [l1,c1]=ramp[i-1],[l2,c2]=ramp[i];if(L<=l2){const k=l2===l1?0:(L-l1)/(l2-l1);return hypMix(c1,c2,Math.max(0,Math.min(1,k)))}}return ramp[ramp.length-1][1]};
+    const one=(tok,prop)=>{
+      const key=prop+'|'+tok;if(cache.has(key))return cache.get(key);
+      const c=hypParse(tok);let out=tok;
+      if(c){const {h,s,l,ch}=hypHslOf(c),a=c.a;let n=null;
+        if(l<.12&&ch<.1&&(/shadow/.test(prop)||a<.75))n=null; // sombras y velos negros: igual
+        else if(ch<.1){ // grises (neutros): escala del tema por luminosidad
+          if(prop==='color'&&l<.2)n={...ink};
+          else n=onRamp(l*100);
+        }else if(h>=85&&h<=175){ // verdes de la app: acento del tema
+          if(l>=.5){const k=Math.max(0,Math.min(1,(l-.7)/.15));n=hypMix(acc,acc2,k)}
+          else n=hypMix(panel,acc,Math.max(.08,Math.min(.6,(l-.05)/.6)));
+        }else if(th.light){ // naranja, rojo, azul… en temas claros: que se lean sobre blanco
+          const fg=prop==='color'||/border|outline|stroke|fill/.test(prop);
+          if(fg&&l>.5)n=hypParse(hypHsl(h,Math.min(85,s*100),36));
+          else if(!fg&&l<.35)n=hypParse(hypHsl(h,Math.min(70,s*80),91));
+        }
+        if(n){n.a=a;out=hypOut(n)}
+      }
+      cache.set(key,out);return out;
+    };
+    return (val,prop)=>val.replace(hypRx,tok=>one(tok,prop));
+  }
+  const hypOrig=new WeakMap(),hypSeen=new Set();
+  function hypRules(list,cb){for(const r of list||[]){if(r.style)cb(r);if(r.cssRules)hypRules(r.cssRules,cb)}}
+  function hypCollect(rule){
+    if(hypOrig.has(rule))return hypOrig.get(rule);
+    const o=[],st=rule.style;
+    for(let i=0;i<st.length;i++){const p=st[i];if(p.startsWith('--'))continue;const v=st.getPropertyValue(p);if(v&&(v.includes('#')||/rgba?\(|hsla?\(/.test(v)))o.push([p,v,st.getPropertyPriority(p)])}
+    hypOrig.set(rule,o);return o;
+  }
+  function hypSheets(fn){for(const sh of document.styleSheets){let rs;try{rs=sh.cssRules}catch{continue}if(sh.ownerNode?.id==='hypVars')continue;hypRules(rs,fn)}}
+  function hypRemap(th){
+    const map=th&&th.id!=='esmeralda'?hypMapper(th):null;
+    if(!map&&!hypSeen.size)return; // diseño original y nunca se cambió: nada que tocar
+    hypSheets(rule=>{const o=hypCollect(rule);if(!o.length)return;hypSeen.add(rule);for(const [p,v,pr] of o){const nv=map?map(v,p):v;if(rule.style.getPropertyValue(p)!==nv)rule.style.setProperty(p,nv,pr)}});
+  }
+  function hypThemeApply(){
+    const raw=data.settings?.hypTheme,t=hypThemeCur(),def=!raw||t.id==='esmeralda',r=document.documentElement.style;
+    document.documentElement.classList.toggle('hyp-themed',!def);
+    document.documentElement.classList.toggle('hyp-light',!!t.light);
+    if(def){for(const k of HYP_TH_KEYS)r.removeProperty('--'+k);for(const k of ['--hyp-chart','--hyp-chart2','--orange','--red','--gold','--ink'])r.removeProperty(k);r.colorScheme=''}
+    else{for(const k of HYP_TH_KEYS)r.setProperty('--'+k,t[k]);r.setProperty('--hyp-chart',t.green);r.setProperty('--hyp-chart2',t.green2);r.setProperty('--ink',t.ink);
+      if(t.light){r.setProperty('--orange','#b45309');r.setProperty('--red','#c0392b');r.setProperty('--gold','#9a6b00')}else{r.removeProperty('--orange');r.removeProperty('--red');r.removeProperty('--gold')}
+      r.colorScheme=t.light?'light':'dark'}
+    try{hypRemap(def?null:t)}catch(e){console.error(e)}
+    try{document.querySelector('meta[name="theme-color"]')?.setAttribute('content',def?'#101512':t.bg)}catch{}
+  }
+  // estilos que se agregan después (otros bloques) también se traducen
+  try{new MutationObserver(ms=>{if(ms.some(m=>[...m.addedNodes].some(n=>n.nodeName==='STYLE'||n.nodeName==='LINK'))){clearTimeout(hypThemeApply._t);hypThemeApply._t=setTimeout(()=>{try{const t=hypThemeCur();if(t.id!=='esmeralda')hypRemap(t)}catch{}},60)}}).observe(document.head,{childList:true})}catch{}
   function hypSetTheme(t){data.settings.hypTheme=t;hypThemeApply();persist(true);try{const box=$('#hypThemeSet');if(box){const open=box.open;box.outerHTML=hypThemeHtml();$('#hypThemeSet').open=open}}catch{}}
   function hypC(v,d){try{return getComputedStyle(document.documentElement).getPropertyValue(v==='--green'?'--hyp-chart':'--hyp-chart2').trim()||d}catch{return d}}
+  function hypSwatch(t,cur){const on=cur.id===t.id;return `<button type="button" class="hyp-sw ${on?'on':''}" data-hyp-theme="${t.id}" style="background:${t.bg};border-color:${on?t.green:t.line};color:${t.text}"><span class="hyp-sw-card" style="background:${t.panel};border-color:${t.line}"><b style="color:${t.text}">Aa</b><i style="background:${t.green}"></i><em style="background:${t.muted}"></em></span><span class="hyp-sw-n">${esc(t.name)}${on?' ✓':''}</span></button>`}
   function hypThemeHtml(){
-    const cur=hypThemeCur();
-    return `<details class="settings-group" id="hypThemeSet"><summary>🎨 Colores de la app</summary><div class="settings-section"><p class="small" style="margin:0 0 10px">Temas oscuros con buen contraste. El color principal se usa en botones, barras y animaciones.</p><div class="hyp-sws">${HYP_THEMES.map(t=>`<button type="button" class="hyp-sw ${cur.id===t.id?'on':''}" data-hyp-theme="${t.id}" style="background:${t.bg};border-color:${cur.id===t.id?t.green:t.line}"><i style="background:${t.green}"></i><i style="background:${t.green2}"></i><span>${t.name}</span></button>`).join('')}</div><label class="field" style="margin-top:12px">Tono personalizado ${cur.id==='custom'?'· activo':''}<input type="range" min="0" max="359" value="${cur.id==='custom'?cur.hue:150}" data-hyp-hue class="hyp-hue"></label><p class="small" style="margin:6px 0 0">Mueve la barra: la app ajusta sola brillo y saturación para que siempre se lea bien.</p></div></details>`;
+    const cur=hypThemeCur(),raw=data.settings?.hypTheme||{},base=raw.id==='custom'?(raw.base||'dark'):'dark',hue=raw.id==='custom'?raw.hue:150;
+    const dark=HYP_THEMES.filter(t=>!t.light),light=HYP_THEMES.filter(t=>t.light);
+    return `<details class="settings-group" id="hypThemeSet"><summary>🎨 Colores de la app</summary><div class="settings-section"><p class="small" style="margin:0 0 10px">Cambia toda la app: fondo, tarjetas, texto, bordes y botones. «Original» es el diseño de siempre.</p><div class="hyp-th-h">Oscuros</div><div class="hyp-sws">${dark.map(t=>hypSwatch(t,cur)).join('')}</div><div class="hyp-th-h">Claros</div><div class="hyp-sws">${light.map(t=>hypSwatch(t,cur)).join('')}</div><div class="hyp-th-h">Personalizado ${cur.id==='custom'?'· activo':''}</div><div class="hyp-base">${[['dark','Oscuro'],['black','Negro'],['light','Claro']].map(([v,n])=>`<button type="button" class="${cur.id==='custom'&&base===v?'on':''}" data-hyp-base="${v}">${n}</button>`).join('')}</div><input type="range" min="0" max="359" value="${hue}" data-hyp-hue class="hyp-hue" aria-label="Tono"><p class="small" style="margin:6px 0 0">Elige base y mueve la barra: la app ajusta sola brillo y contraste para que todo se lea bien.</p></div></details>`;
   }
-  document.addEventListener('input',e=>{const h=e.target.closest?.('[data-hyp-hue]');if(!h)return;data.settings.hypTheme={id:'custom',hue:Number(h.value)};hypThemeApply()});
-  document.addEventListener('change',e=>{const h=e.target.closest?.('[data-hyp-hue]');if(!h)return;hypSetTheme({id:'custom',hue:Number(h.value)})});
+  const hypCustomBase=()=>{const t=data.settings?.hypTheme;return t?.id==='custom'?(t.base||'dark'):'dark'};
+  let hypHueT=0;
+  document.addEventListener('input',e=>{const h=e.target.closest?.('[data-hyp-hue]');if(!h)return;data.settings.hypTheme={id:'custom',hue:Number(h.value),base:hypCustomBase()};clearTimeout(hypHueT);hypHueT=setTimeout(hypThemeApply,40)});
+  document.addEventListener('change',e=>{const h=e.target.closest?.('[data-hyp-hue]');if(!h)return;hypSetTheme({id:'custom',hue:Number(h.value),base:hypCustomBase()})});
+  document.addEventListener('click',e=>{const b=e.target.closest?.('[data-hyp-base]');if(!b)return;const t=data.settings?.hypTheme;hypSetTheme({id:'custom',hue:t?.id==='custom'?t.hue:150,base:b.dataset.hypBase})});
   const _rsHyp=renderSettings;
   renderSettings=function(){const r=_rsHyp.apply(this,arguments);try{const box=$('#settingsContent');if(box&&!$('#hypThemeSet')){const nov=$('#v88NovSet');if(nov)nov.insertAdjacentHTML('afterend',hypThemeHtml());else box.insertAdjacentHTML('afterbegin',hypThemeHtml())}
     if(box&&HYP_ON&&!$('#hypSetPlan'))$('#hypThemeSet')?.insertAdjacentHTML('afterend',`<details class="settings-group" id="hypSetPlan"><summary>📈 Plan de hipertrofia</summary><div class="settings-section"><p class="small" style="margin:0 0 8px">${hypOn()?'Activo. Puedes volver a tus rutinas anteriores cuando quieras.':'No aplicado.'}</p><button class="secondary" data-hyp-open>Ver plan y estudios</button></div></details>`)}catch(e){console.error(e)}return r};
@@ -548,12 +628,16 @@ ${pr('<b>Descarga:</b> solo cuando hay fatiga alta y estancamiento; programarla 
     .an-cb{stroke:var(--muted);stroke-width:1.6;stroke-dasharray:3 3}
     .an-pad{fill:var(--panel2);stroke:var(--muted);stroke-width:2.5}.an-pad2{fill:var(--panel2);stroke:var(--line);stroke-width:2}
     .hyp-sws{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
-    .hyp-sw{border:2px solid;border-radius:14px;padding:9px 4px 7px;display:flex;flex-direction:column;align-items:center;gap:4px;color:#eff5f2;font-size:11.5px}
-    .hyp-sw i{display:inline-block;width:22px;height:8px;border-radius:99px}
-    .hyp-sw.on{box-shadow:0 0 0 2px color-mix(in srgb,var(--green) 40%,transparent)}
+    .hyp-sw{border:2px solid;border-radius:14px;padding:6px 5px 6px;display:flex;flex-direction:column;align-items:stretch;gap:5px;font-size:11px;font-weight:700;line-height:1.15}
+    .hyp-sw-card{display:flex;align-items:center;gap:5px;border:1px solid;border-radius:9px;padding:5px 6px}
+    .hyp-sw-card b{font-size:13px}.hyp-sw-card i{flex:1;height:9px;border-radius:99px}.hyp-sw-card em{width:9px;height:9px;border-radius:50%;opacity:.7}
+    .hyp-sw-n{text-align:center;min-height:2.3em;display:flex;align-items:center;justify-content:center}
+    .hyp-sw.on{box-shadow:0 0 0 2px color-mix(in srgb,var(--green) 45%,transparent)}
+    .hyp-th-h{font-size:12px;font-weight:800;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin:12px 0 7px}
+    .hyp-base{display:flex;gap:6px;margin-bottom:10px}.hyp-base button{flex:1;padding:8px;border-radius:12px;border:1px solid var(--line);background:var(--panel2);color:var(--text);font-weight:700}
+    .hyp-base button.on{background:var(--green);color:var(--ink,#0b120d);border-color:var(--green)}
     .hyp-hue{width:100%;accent-color:var(--green);height:28px;background:linear-gradient(90deg,hsl(0 78% 72%),hsl(60 78% 72%),hsl(120 78% 72%),hsl(180 78% 72%),hsl(240 78% 72%),hsl(300 78% 72%),hsl(359 78% 72%));border-radius:99px;-webkit-appearance:none;appearance:none;padding:0;border:0}
     .hyp-hue::-webkit-slider-thumb{-webkit-appearance:none;width:26px;height:26px;border-radius:50%;background:#fff;border:3px solid #0008}
   </style>`);
   try{hypThemeApply()}catch(e){console.error(e)}
   try{hypSyncBuiltins();_rebuildHyp()}catch(e){console.error(e)}
-
