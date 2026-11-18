@@ -1,0 +1,2 @@
+- 🔧 Arreglo: en Ajustes ya se pueden abrir las secciones (Colores, Widgets, Música…)
+- Las pestañas de Ajustes quedan fijas arriba al bajar

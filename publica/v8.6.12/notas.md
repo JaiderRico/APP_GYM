@@ -1,0 +1,1 @@
+- 🔧 Arreglo: en Ajustes ya se pueden abrir las secciones

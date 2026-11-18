@@ -73,7 +73,7 @@
     if(vis.length===1&&!vis[0].open)vis[0].open=true; // una sola sección: abierta de una
   }
   function v8611SetTab(k){v8611Tab=k;try{localStorage.setItem(V8611_TAB_KEY,k)}catch{}v8611Organize();try{$('#settingsModal .modal-panel')?.scrollTo?.({top:0})}catch{}}
-  document.addEventListener('click',e=>{const b=e.target.closest?.('[data-stg-tab]');if(b){e.preventDefault();v8611SetTab(b.dataset.stgTab)}});
+  document.addEventListener('click',e=>{const b=e.target.closest?.('#stgTabs button[data-stg-tab]');if(b){e.preventDefault();v8611SetTab(b.dataset.stgTab)}});
   const _rs8611=renderSettings;
   renderSettings=function(){
     const r=_rs8611.apply(this,arguments);
@@ -146,7 +146,7 @@
 
   document.head.insertAdjacentHTML('beforeend',`<style id="v8611Css">
     body.mp-noher #hmEntry,body.mp-noher .pv-tabs{display:none!important}
-    .stg-tabs{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin:0 0 12px}
+    .stg-tabs{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin:0 0 12px;padding:6px 0;position:sticky;top:-1px;z-index:3;background:var(--panel)}
     .stg-tabs button{display:flex;flex-direction:column;align-items:center;gap:2px;padding:8px 6px;border-radius:14px;border:1px solid var(--line);background:var(--panel2);color:var(--muted);font-size:12px;font-weight:800}
     .stg-tabs button span{font-size:18px;line-height:1}
     .stg-tabs button.on{background:color-mix(in srgb,var(--green) 16%,var(--panel2));border-color:color-mix(in srgb,var(--green) 55%,var(--line));color:var(--text)}
