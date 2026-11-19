@@ -1,0 +1,2 @@
+- 🔍 Animaciones 3D: ahora puedes hacer zoom (pellizca con dos dedos o usa los botones ＋ y －)
+- Mueve la figura con dos dedos; el botón Reset la deja como estaba
