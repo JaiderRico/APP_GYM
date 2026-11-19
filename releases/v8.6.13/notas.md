@@ -1,0 +1,1 @@
+- 🆕 Animaciones 3D de los ejercicios: figura más realista y puedes girar la cámara 360°
