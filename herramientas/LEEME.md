@@ -113,6 +113,16 @@
   muestra, en Ajustes → Personas); (3) Ajustes en pestañas (`#stgTabs`; cada bloque se clasifica por su título con
   `V8611_TABS`; si algo abre un bloque de otra pestaña, cambia sola); (4) Simulador: `localStorage` en memoria,
   `nativeSave`/`saveBackupVersion` sin efecto, sin Apps Script, descansos de 10 s opcionales; salir = `location.reload()`.
+- `fuente/v8615_cuerpo_rutina.js` (8.6.15, **solo app de Jaider**; va justo antes de `initV7();`, después de v8611): (1) la
+  semana de Jaider reemplaza `HYP_PLAN` (Lun Push · Mar Pull · Mié Pierna A + rueda abdominal · Jue descanso · Vie Torso +
+  crunch con disco · Sáb Hombros+Brazos · Dom Pierna B) y se aplica sola una vez (`hypPlan.v=2`, sin borrar `routineOrder`);
+  ya no hay tarjeta «Aplicar»; deshacer queda en Ajustes → 📈 Mi semana (`settings.hypOff`). «Rueda abdominal» se agrega al catálogo.
+  (2) Pestaña **Cuerpo** (`#cuerpo`, 6.º botón): Peso y medidas (`#achBody` movido), Fotos (`#achPhotos`) y Caminatas;
+  «Estadísticas» vuelve a Logros (`#achStats`). `go:weight`/`go:photos` abren Cuerpo (`v8615Pane`). (3) Caminatas en
+  `data.walks` `{id,at,date,min,kmh?,incl?,km?,place:'cinta'|'afuera',note?}`; solo caminar (aviso sobre 6,5 km/h); kcal con la
+  ecuación de caminar del ACSM y el último peso. (4) `body.mp-noher` también esconde 💬 (`#v85ChatBtn`) salvo mensajes sin leer.
+  Las 8.6.13–8.6.15 se publicaron solo para Jaider (la de Ella y la libre siguen en 8.6.12): `mp.py publicar` exige la APK
+  de Ella de la versión base, así que para estas se llamó `publicar` con `mp.APPS` reducido a `jaider`.
 - `fuente/v890_snacks.js` (8.5.19, apps de **Jaider y Ella**; la libre lo trae apagado por `MP_PUBLICA`): editor de la
   lista de snacks de Ella, guardada en el servidor (`snacks_ella.json`, acciones `snacks_get` / `snacks_edit` con
   `op: add|upd|del|reset`, backend v21; usuario `ella` o `prueba` como el resto). Ella lo abre desde Comida → “✏️ Mi lista”;

@@ -1,0 +1,4 @@
+- 📅 Tu semana nueva como rutina fija (Lun Push · Mar Pull · Mié Pierna A · Jue descanso · Vie Torso · Sáb Hombros + Brazos · Dom Pierna B), sin botón de aplicar
+- ⚖ Nueva pestaña Cuerpo: peso y medidas, fotos y caminatas por separado; Logros queda solo con marcas y estadísticas
+- 🚶 Registro de caminatas (caminadora o afuera) con resumen semanal
+- 💬 El chat se esconde junto con «Progreso de Ella»
