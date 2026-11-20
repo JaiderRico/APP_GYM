@@ -1,0 +1,3 @@
+- 🏋️ Ajustes → Qué ver en Entrenar: esconde simulador, «Por qué», calculadora de discos o aviso de fatiga
+- 🍽 Comida: ya no se listan todos los alimentos; al escribir te sugiere lo que ya has puesto
+- 🏋 Pesa más realista en el inicio

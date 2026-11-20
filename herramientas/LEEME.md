@@ -123,6 +123,11 @@
   ecuación de caminar del ACSM y el último peso. (4) `body.mp-noher` también esconde 💬 (`#v85ChatBtn`) salvo mensajes sin leer.
   Las 8.6.13–8.6.15 se publicaron solo para Jaider (la de Ella y la libre siguen en 8.6.12): `mp.py publicar` exige la APK
   de Ella de la versión base, así que para estas se llamó `publicar` con `mp.APPS` reducido a `jaider`.
+- `fuente/v8616_ocultar_comidas_pesa.js` (8.6.16, **solo app de Jaider**; justo antes de `initV7();`, después de v8615):
+  (1) Ajustes → «🏋️ Qué ver en Entrenar»: `data.settings.trainHide {sim, why, plates, fatigue}` → clases `th-*` en `<body>`
+  que esconden `#v8611SimCard`, `.hyp-line`, la calculadora (`details.v8616-plates`) y `#fatigueSetup`. (2) Comida: reemplaza
+  `v93ChipsHtml` para mostrar solo lo marcado (tocar = quitar) sin pestañas ni lista completa; lo demás sale en las
+  sugerencias al escribir (`v93RenderSug`). (3) Pesa del inicio en SVG (`.v8616-bb`), sin `.hero:before/:after`.
 - `fuente/v890_snacks.js` (8.5.19, apps de **Jaider y Ella**; la libre lo trae apagado por `MP_PUBLICA`): editor de la
   lista de snacks de Ella, guardada en el servidor (`snacks_ella.json`, acciones `snacks_get` / `snacks_edit` con
   `op: add|upd|del|reset`, backend v21; usuario `ella` o `prueba` como el resto). Ella lo abre desde Comida → “✏️ Mi lista”;
