@@ -128,6 +128,14 @@
   que esconden `#v8611SimCard`, `.hyp-line`, la calculadora (`details.v8616-plates`) y `#fatigueSetup`. (2) Comida: reemplaza
   `v93ChipsHtml` para mostrar solo lo marcado (tocar = quitar) sin pestañas ni lista completa; lo demás sale en las
   sugerencias al escribir (`v93RenderSug`). (3) Pesa del inicio en SVG (`.v8616-bb`), sin `.hero:before/:after`.
+- `fuente/v8618_flotante_reps.js` + `fuente/Pip.java` (8.6.18, **solo app de Jaider**; justo antes de `initV7();`, después de
+  v8616): la ventana flotante no deja tocar su contenido, así que los botones son `RemoteAction` (salen al tocar la ventana).
+  La página manda `NativeStore.savePhoto('__pip__','act:id~grande~pequeño|…')` (máx. 3; `'acts'` = ¿lo entiende?) y Pip.java
+  (receptor dinámico `com.jaider.gimnasio.PIP_ACT`, NOT_EXPORTED) llama `v8618PipTap(id)` en el WebView. En cada serie:
+  reps de la vez pasada (`targetForSet().solo`) −1/igual/+1 → RIR 0/1/2 → `finishCurrentSet()`. Calentamiento y «al fallo»
+  terminan con las reps; drop/rest-pause no tienen botones. Pip.java ahora guarda forma, auto-entrar y botones (`sW/sH/sAuto/sActs`)
+  y los reenvía juntos. En la app: botones de reps debajo de Repeticiones. Ajustes → Ventana flotante: «Tamaño del contenido»
+  (`data.settings.pip.scale`, 60–170 %). classes7.dex se rearmó cambiando solo los `Pip*.smali` (baksmali → smali a).
 - `fuente/v890_snacks.js` (8.5.19, apps de **Jaider y Ella**; la libre lo trae apagado por `MP_PUBLICA`): editor de la
   lista de snacks de Ella, guardada en el servidor (`snacks_ella.json`, acciones `snacks_get` / `snacks_edit` con
   `op: add|upd|del|reset`, backend v21; usuario `ella` o `prueba` como el resto). Ella lo abre desde Comida → “✏️ Mi lista”;

@@ -1,0 +1,3 @@
+- ⧉ Ventana flotante: toca la ventana durante una serie y marca las reps (vez pasada −1, igual o +1) y luego el RIR 0, 1 o 2; la serie queda registrada sin abrir la app
+- 🔢 Los mismos botones de reps debajo de Repeticiones en la app
+- 🔍 Ajustes → Ventana flotante → «Tamaño del contenido»
