@@ -1,0 +1,1 @@
+- 🙈 Simulador, «Por qué» y calculadora de discos escondidos en Entrenar de entrada (se prenden en Ajustes → Qué ver en Entrenar)

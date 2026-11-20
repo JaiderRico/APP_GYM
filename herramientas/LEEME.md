@@ -124,7 +124,7 @@
   Las 8.6.13–8.6.15 se publicaron solo para Jaider (la de Ella y la libre siguen en 8.6.12): `mp.py publicar` exige la APK
   de Ella de la versión base, así que para estas se llamó `publicar` con `mp.APPS` reducido a `jaider`.
 - `fuente/v8616_ocultar_comidas_pesa.js` (8.6.16, **solo app de Jaider**; justo antes de `initV7();`, después de v8615):
-  (1) Ajustes → «🏋️ Qué ver en Entrenar»: `data.settings.trainHide {sim, why, plates, fatigue}` → clases `th-*` en `<body>`
+  (1) Ajustes → «🏋️ Qué ver en Entrenar»: `data.settings.trainHide {sim, why, plates, fatigue}` (desde 8.6.17 sim, why y plates escondidos por defecto: `V8616_DEF`) → clases `th-*` en `<body>`
   que esconden `#v8611SimCard`, `.hyp-line`, la calculadora (`details.v8616-plates`) y `#fatigueSetup`. (2) Comida: reemplaza
   `v93ChipsHtml` para mostrar solo lo marcado (tocar = quitar) sin pestañas ni lista completa; lo demás sale en las
   sugerencias al escribir (`v93RenderSug`). (3) Pesa del inicio en SVG (`.v8616-bb`), sin `.hero:before/:after`.

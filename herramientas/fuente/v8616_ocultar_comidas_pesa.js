@@ -10,18 +10,19 @@
 
   /* ---------- (1) Qué ver en Entrenar ---------- */
   const V8616_TH=[['sim','🧪 Simulador'],['why','📚 «Por qué» de mi semana'],['plates','◉ Calculadora de discos'],['fatigue','🔋 Aviso de fatiga']];
-  function v8616Hidden(){const h=data.settings?.trainHide;return h&&typeof h==='object'?h:{}}
+  const V8616_DEF={sim:true,why:true,plates:true,fatigue:false}; // escondidos de entrada (8.6.17)
+  function v8616Hidden(){const h=data.settings?.trainHide;return {...V8616_DEF,...(h&&typeof h==='object'?h:{})}}
   function v8616ApplyTh(){const h=v8616Hidden();for(const [k] of V8616_TH)document.body.classList.toggle('th-'+k,!!h[k])}
   function v8616SetHtml(){
     const h=v8616Hidden();
-    return `<details class="settings-group" id="v8616ThSet"><summary>🏋️ Qué ver en Entrenar (simulador, discos…)</summary><div class="settings-section"><p class="small" style="margin:0 0 10px">Apaga lo que no usas al preparar el entreno. Nada se borra: lo vuelves a prender aquí cuando quieras.</p>${V8616_TH.map(([k,l])=>`<label class="toggle-row"><input type="checkbox" data-v8616-th="${k}" ${h[k]?'':'checked'}> ${l}</label>`).join('')}</div></details>`;
+    return `<details class="settings-group" id="v8616ThSet"><summary>🏋️ Qué ver en Entrenar (simulador, discos…)</summary><div class="settings-section"><p class="small" style="margin:0 0 10px">Simulador, «Por qué» y calculadora vienen escondidos. Prende aquí lo que quieras ver al preparar el entreno.</p>${V8616_TH.map(([k,l])=>`<label class="toggle-row"><input type="checkbox" data-v8616-th="${k}" ${h[k]?'':'checked'}> ${l}</label>`).join('')}</div></details>`;
   }
   try{const pd=$('#plateOptions')?.closest('details');if(pd)pd.classList.add('v8616-plates')}catch{}
   const _rs8616=renderSettings;
   renderSettings=function(){const r=_rs8616.apply(this,arguments);try{const host=$('#settingsContent');if(host&&!$('#v8616ThSet'))host.insertAdjacentHTML('beforeend',v8616SetHtml())}catch(e){console.error(e)}return r};
   document.addEventListener('change',e=>{
     const c=e.target.closest?.('[data-v8616-th]');if(!c)return;
-    const h={...v8616Hidden()};if(c.checked)delete h[c.dataset.v8616Th];else h[c.dataset.v8616Th]=true;
+    const h={...v8616Hidden()};h[c.dataset.v8616Th]=!c.checked;
     data.settings.trainHide=h;persist(true);v8616ApplyTh();
     const l=(V8616_TH.find(x=>x[0]===c.dataset.v8616Th)||[])[1]||'';toast(`${l}: ${c.checked?'visible':'escondido'} en Entrenar`);
   });
