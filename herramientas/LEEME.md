@@ -136,6 +136,14 @@
   terminan con las reps; drop/rest-pause no tienen botones. Pip.java ahora guarda forma, auto-entrar y botones (`sW/sH/sAuto/sActs`)
   y los reenvía juntos. En la app: botones de reps debajo de Repeticiones. Ajustes → Ventana flotante: «Tamaño del contenido»
   (`data.settings.pip.scale`, 60–170 %). classes7.dex se rearmó cambiando solo los `Pip*.smali` (baksmali → smali a).
+- `fuente/v8619_voz_descanso.js` + `fuente/Speak.java` (8.6.19, **solo app de Jaider**; justo antes de `initV7();`, después de
+  v8618): al terminar el descanso el teléfono lee la siguiente serie (TextToSpeech es-CO, audio de guía con foco transitorio
+  que atenúa la música). La página guarda la frase con `NativeStore.savePhoto('__speak__','set:<frase>')` (también `on:1|0`,
+  `test:<frase>`, `ok`; Ext2 lo enruta a Speak). Ganchos en smali de **classes3** (RestAlarm): `onReceive` llama
+  `Speak.hold(this)` (goAsync, mantiene despierto ~9 s) antes de `deliver` y `Speak.release()` después; `deliver` llama
+  `Speak.due(ctx)` justo antes de `channel()` (solo cuando el descanso terminó; también vale para `finishRest` con la app
+  abierta). La frase se borra al decirla (una vez por descanso). Ajustes → «🔊 Voz al terminar el descanso»
+  (`data.settings.restVoice {on, load, rir}`). Para compilar Ext2/Speak/Pip: stub de `QuickWidget.requestPin`.
 - `fuente/v890_snacks.js` (8.5.19, apps de **Jaider y Ella**; la libre lo trae apagado por `MP_PUBLICA`): editor de la
   lista de snacks de Ella, guardada en el servidor (`snacks_ella.json`, acciones `snacks_get` / `snacks_edit` con
   `op: add|upd|del|reset`, backend v21; usuario `ella` o `prueba` como el resto). Ella lo abre desde Comida → “✏️ Mi lista”;

@@ -1,0 +1,1 @@
+- 🔊 Al terminar el descanso, el teléfono dice en voz alta la siguiente serie: ejercicio, peso y objetivo de repeticiones (con pantalla apagada o música; la baja mientras habla). Ajustes → Voz al terminar el descanso

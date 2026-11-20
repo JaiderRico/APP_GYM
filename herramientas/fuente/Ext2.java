@@ -12,12 +12,13 @@ import android.view.KeyEvent;
  *  - "__widget_pin__" : con valor "q:<tipo>" pide a Android fijar un widget de acceso rápido.
  *  - "__pip__" (8.5.0): ventana flotante (picture-in-picture). Valores en Pip.java:
  *                       "supported" | "enter" | "enter:9:16" | "auto:1" | "auto:0" | "active".
+ *  - "__speak__" (8.6.19): leer en voz alta la siguiente serie al terminar el descanso (Speak.java).
  */
 public final class Ext2 {
     private Ext2() { }
 
     public static boolean handles(String key, String value) {
-        if ("__media__".equals(key) || "__pip__".equals(key)) return true;
+        if ("__media__".equals(key) || "__pip__".equals(key) || Speak.handles(key)) return true;
         return "__widget_pin__".equals(key) && value != null && value.startsWith("q:");
     }
 
@@ -25,6 +26,7 @@ public final class Ext2 {
         try {
             if ("__media__".equals(key)) return media(ctx, value);
             if ("__pip__".equals(key)) return Pip.handle(ctx, value);
+            if (Speak.handles(key)) return Speak.hook(ctx, value);
             if ("__widget_pin__".equals(key)) return QuickWidget.requestPin(ctx, value.substring(2));
         } catch (Throwable ignored) { }
         return false;
