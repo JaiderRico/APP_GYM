@@ -1,0 +1,1 @@
+- ⚖️ Pesar comida: barras de calorías y proteína con lo que llevabas antes, lo que suma esta comida y cuánto falta o te pasas

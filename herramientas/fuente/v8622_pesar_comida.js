@@ -92,7 +92,8 @@
     const remK=Math.max(0,K-usedK),remP=Math.max(0,P-usedP);
     let k=remK*sh,p=remP*sh;
     if(type==='snack'){k=Math.min(k,K*.15);p=Math.min(p,P*.2)}
-    return {k:Math.round(k),p:Math.round(p),remK,usedK,K,P,usedP};
+    const estN=ms.filter(m=>!(Number(m.kcal)>0)).length;
+    return {k:Math.round(k),p:Math.round(p),remK,usedK,K,P,usedP,estN};
   }
 
   // Reparte gramos: verduras/grasas/fijos con su porción; proteínas hasta la meta de proteína; carbohidratos con lo que sobra.
@@ -128,19 +129,28 @@
   function v8622Tot(){let k=0,p=0;for(const r of v8622St.rows){const f=v8622Food(r.id);if(!f)continue;const o=v8622Of(f,r.g||0);k+=o.k;p+=o.p}return {k:Math.round(k),p:Math.round(p)}}
   function v8622Units(f,g){if(!f.ug||!g)return '';const n=Math.round(g/f.ug*10)/10;return ` ≈ ${String(n).replace('.',',')} ${f.u}${n===1?'':(/[aeiou]$/.test(f.u)?'s':'es')}`}
 
+  // Barra: azul = lo que llevabas antes de esta comida, verde = esta comida, naranja = lo que pasa de la meta; raya = la meta.
+  function v8622Bar(lab,before,meal,goal,u){
+    before=Math.round(before);meal=Math.round(meal);const tot=before+meal,sc=Math.max(goal,tot)||1,pc=x=>Math.max(0,x/sc*100);
+    const over=Math.max(0,tot-goal),mIn=Math.max(0,meal-Math.max(0,before+meal-goal)-Math.max(0,before-goal)),bIn=Math.min(before,goal);
+    const rest=goal-tot;
+    return `<div class="v8622-bar"><div class="v8622-bh"><span>${lab}</span><b>${tot} / ${goal} ${u}</b></div>
+      <div class="v8622-tr"><i class="b" style="width:${pc(bIn)}%"></i><i class="m" style="width:${pc(mIn)}%"></i><i class="o" style="width:${pc(over)}%"></i>${over?`<em style="left:${pc(goal)}%"></em>`:''}</div>
+      <div class="v8622-bs"><span>Antes ${before} · esta comida +${meal}</span><span class="${rest<0?'ov':rest===0?'ok':''}">${rest>0?`Faltan ${rest} ${u}`:rest===0?'Meta cumplida':`Te pasas ${-rest} ${u}`}</span></div></div>`;
+  }
   function v8622Html(){
     const S=v8622St,B=S.B||v8622Budget(S.type,S.date,S.editId),T=v8622Tot();
     const q=v8622Norm(S.q),list=v8622Foods().filter(f=>!S.rows.some(r=>r.id===f.id)&&(!q||v8622Norm(f.n).includes(q)));
-    const diff=T.k-B.k,dCls=Math.abs(diff)<=60?'ok':diff>0?'over':'under';
     const rows=S.rows.map(r=>{const f=v8622Food(r.id);if(!f)return '';const o=v8622Of(f,r.g||0);
       return `<div class="v8622-row"><div class="nm"><b>${esc(f.n)}</b><small>${V8622_ROLE[f.r]||''}${r.manual?' · lo pesaste':''}</small></div>
       <div class="gr"><button class="secondary" data-v8622-step="${esc(r.id)}" data-d="-1">−</button><input type="number" inputmode="numeric" min="0" step="5" value="${Math.round(r.g||0)}" data-v8622-g="${esc(r.id)}"><span>g</span><button class="secondary" data-v8622-step="${esc(r.id)}" data-d="1">＋</button></div>
       <div class="kc">${Math.round(o.k)} kcal · ${Math.round(o.p)} g prot${esc(v8622Units(f,r.g))}</div><button class="v8622-x" data-v8622-del="${esc(r.id)}" aria-label="Quitar">✕</button></div>`}).join('');
     return `<div class="v8622p"><div class="v8622-h"><h2>⚖️ Pesar comida</h2><button class="v8622-x" data-v8622-close aria-label="Cerrar">✕</button></div>
       <div class="seg2 meal-tabs">${Object.entries(MEAL_TYPES).map(([k,v])=>`<button type="button" class="${S.type===k?'on':''}" data-v8622-type="${k}">${v}</button>`).join('')}</div>
-      <div class="v8622-goal"><div><span>Para esta comida</span><b>${B.k} kcal · ${B.p} g prot</b></div><div><span>Llevas hoy</span><b>${Math.round(B.usedK)} / ${B.K} kcal</b></div></div>
+      <div class="v8622-bars">${v8622Bar('🔥 Calorías',B.usedK,T.k,B.K,'kcal')}${v8622Bar('🍗 Proteína',B.usedP,T.p,B.P,'g')}
+      <div class="v8622-leg"><span><i class="b"></i>Antes de esta comida</span><span><i class="m"></i>Esta comida</span>${B.estN?`<span>· ${B.estN} comida${B.estN>1?'s':''} sin kcal: estimada${B.estN>1?'s':''}</span>`:''}</div>
+      <div class="v8622-sug">Sugerido para esta comida: <b>${B.k} kcal · ${B.p} g prot</b></div></div>
       ${S.rows.length?`<div class="v8622-list">${rows}</div>
-      <div class="v8622-tot ${dCls}"><b>Total: ${T.k} kcal · ${T.p} g proteína</b><span>${Math.abs(diff)<=60?'Justo en lo que te toca 👌':diff>0?`Te pasas ~${diff} kcal`:`Te faltan ~${-diff} kcal`}</span></div>
       <div class="row v8622-act"><button class="secondary" data-v8622-auto>↺ Recalcular</button><button class="primary" data-v8622-save>${S.editId?'Guardar cambios':'✓ Ya lo pesé, guardar'}</button></div>
       <p class="small">Pesa todo como se come (arroz y carne ya cocidos, atún escurrido). Si sirves otra cantidad, escríbela: lo demás se reajusta.</p>`
       :`<p class="small" style="margin:12px 0 4px">Elige lo que vas a comer y te digo cuántos gramos servir de cada cosa.</p>`}
@@ -184,8 +194,14 @@
       .v8622p{background:var(--panel);border:1px solid var(--line);border-radius:20px 20px 0 0;width:min(560px,100%);max-height:94vh;overflow:auto;padding:16px 14px calc(18px + env(safe-area-inset-bottom))}
       .v8622-h{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px}.v8622-h h2{margin:0;font-size:20px}
       .v8622-x{margin:0;min-width:0;width:34px;height:34px;padding:0;border-radius:50%;background:transparent;border:1px solid var(--line);color:var(--muted)}
-      .v8622-goal{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:12px 0}.v8622-goal>div{background:var(--panel2);border-radius:12px;padding:9px 11px}
-      .v8622-goal span{display:block;font-size:11px;color:var(--muted)}.v8622-goal b{font-size:14px}
+      .v8622-bars{position:sticky;top:-16px;z-index:2;margin:12px -14px;padding:10px 14px 8px;background:var(--panel);border-bottom:1px solid var(--line)}
+      .v8622-bar{margin-bottom:9px}.v8622-bh{display:flex;justify-content:space-between;align-items:baseline;font-size:13px;margin-bottom:4px}.v8622-bh b{font-size:14px}
+      .v8622-tr{position:relative;height:14px;border-radius:8px;background:var(--panel2);overflow:hidden;display:flex}
+      .v8622-tr i{display:block;height:100%;transition:width .25s}.v8622-tr i.b{background:#60a5fa}.v8622-tr i.m{background:var(--green)}.v8622-tr i.o{background:var(--orange,#f59e0b)}
+      .v8622-tr em{position:absolute;top:-2px;bottom:-2px;width:2px;background:var(--text)}
+      .v8622-bs{display:flex;justify-content:space-between;gap:6px;font-size:11.5px;color:var(--muted);margin-top:3px}.v8622-bs .ok{color:var(--green)}.v8622-bs .ov{color:var(--orange,#f59e0b)}
+      .v8622-leg{display:flex;flex-wrap:wrap;gap:4px 12px;font-size:11px;color:var(--muted)}.v8622-leg i{display:inline-block;width:9px;height:9px;border-radius:3px;margin-right:4px;vertical-align:-1px}.v8622-leg i.b{background:#60a5fa}.v8622-leg i.m{background:var(--green)}
+      .v8622-sug{font-size:12px;color:var(--muted);margin-top:4px}.v8622-sug b{color:var(--text)}
       .v8622-list{display:grid;gap:8px}
       .v8622-row{position:relative;display:grid;grid-template-columns:1fr auto;gap:4px 8px;align-items:center;background:var(--panel2);border:1px solid var(--line);border-radius:14px;padding:10px 40px 10px 12px}
       .v8622-row .nm b{display:block;font-size:14px;line-height:1.25}.v8622-row .nm small,.v8622-row .kc{font-size:11.5px;color:var(--muted)}
