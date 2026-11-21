@@ -132,7 +132,9 @@ public final class Speak {
                 finishPending();
             }
         };
-        H.postDelayed(done, 9000); // límite de goAsync (~10 s)
+        // 8.6.21: antes 9 s y se cortaba el final (el RIR) cuando el motor de voz tardaba en arrancar. La alarma del
+        // descanso es un broadcast de fondo (goAsync aguanta ~60 s); se suelta antes, apenas termina de hablar (onDone).
+        H.postDelayed(done, 30000);
         H.post(new Runnable() {
             @Override public void run() {
                 try { if (sTts != null) sTts.shutdown(); } catch (Throwable ignored) { }
@@ -151,7 +153,7 @@ public final class Speak {
                                     .setUsage(AudioAttributes.USAGE_ASSISTANCE_NAVIGATION_GUIDANCE)
                                     .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH).build());
                         } catch (Throwable ignored) { }
-                        t.setSpeechRate(0.95f);
+                        t.setSpeechRate(1.0f);
                         t.setOnUtteranceProgressListener(new UtteranceProgressListener() {
                             @Override public void onStart(String id) { }
                             @Override public void onDone(String id) { H.removeCallbacks(done); H.postDelayed(done, 300); }

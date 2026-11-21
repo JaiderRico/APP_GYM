@@ -1,0 +1,1 @@
+- 🔊 La voz del final del descanso ya no se corta antes del RIR
