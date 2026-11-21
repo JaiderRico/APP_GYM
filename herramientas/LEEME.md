@@ -147,6 +147,15 @@
   Desde 8.6.20 cuando habla **no suena la alarma**: en `deliver` el `const-string v7, "rest_finished_loud_v711"` del
   `Notification.Builder` se cambió por `Speak.channelId(ctx)`, que devuelve el canal sin sonido `rest_voice_v8620` (solo
   vibra) si `due` arrancó la voz. Si el motor de voz falla o no hay español, `fallbackAlarm` reproduce `raw/rest_alarm`.
+- `fuente/v8622_pesar_comida.js` (8.6.22, **solo app de Jaider**; la libre lo trae apagado por `MP_PUBLICA`/`V88_APP`; justo
+  antes de `initV7();`, después de v8619): Comida → «⚖️ Pesar comida» (ventana `#v8622`, role=dialog para que v88 la cierre con
+  volver). La primera vez fija `data.settings.nutritionGoals` en 2400 kcal / 140 g (copia anterior en `settings.v8622.prev`).
+  Presupuesto = lo que queda del día × `V8622_SPLIT` (des 25 · alm 35 · snack 10 · cena 30) entre esta comida y las que faltan;
+  una comida guardada sin kcal (almuerzo de la U) cuenta como su parte normal. Reparto (`v8622Plan`): verdura/grasa/fijo con su
+  porción, proteínas hasta la meta de proteína (máx. 60 % de las kcal, en unidades si tienen: huevo, lata), carbohidratos con lo
+  que sobra (5 g), 3 pasadas para restar la proteína de los carbohidratos. Gramos cambiados a mano = `manual` (no se recalculan).
+  Base `V8622_DB` (por 100 g como se come) + propios en `settings.v8622.mine`; última selección por tipo en `settings.v8622.last`.
+  Guarda una comida normal con `pesada:[{id,n,g,k,p}]`; ⚖️ junto al 🗑 la reabre para cambiar gramos.
 - `fuente/v890_snacks.js` (8.5.19, apps de **Jaider y Ella**; la libre lo trae apagado por `MP_PUBLICA`): editor de la
   lista de snacks de Ella, guardada en el servidor (`snacks_ella.json`, acciones `snacks_get` / `snacks_edit` con
   `op: add|upd|del|reset`, backend v21; usuario `ella` o `prueba` como el resto). Ella lo abre desde Comida → “✏️ Mi lista”;

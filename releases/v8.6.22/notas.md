@@ -1,0 +1,2 @@
+--notas
+- ⚖️ Pesar comida: elige lo que vas a comer y la app te dice cuántos gramos servir de cada cosa para llegar a tu meta (2400 kcal · 140 g proteína)
