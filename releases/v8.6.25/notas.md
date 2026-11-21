@@ -1,0 +1,1 @@
+- ⚖️ Pesar comida: al meter otro alimento reparte de nuevo y te dice qué bajar; 🔒 para fijar lo que ya serviste

@@ -10,12 +10,12 @@
   const V8622_ON=!(typeof MP_PUBLICA!=='undefined'&&MP_PUBLICA)&&(typeof V88_APP==='undefined'||V88_APP==='j');
   const V8622_SPLIT={desayuno:25,almuerzo:35,snack:10,cena:30};
   const V8622_DEF={kcal:2400,protein:140};
-  // [id, nombre, kcal, prot, carb, grasa, rol, unidad?, gramos por unidad?, gramos por defecto (V/G/F)]
+  // [id, nombre, kcal, prot, carb, grasa, rol, unidad?, gramos por unidad?, gramos por defecto (V/G/F), máximo sugerido (g)]
   const V8622_DB=[
     // Ordenados por lo que más comes (respaldo 26 oct – 21 nov). Valores por 100 g (o 100 ml) como se come.
     ['arroz','Arroz blanco (casero, con aceite)',145,2.6,28,2.5,'C'],
-    ['huevo','Huevo cocido',155,12.6,1.1,10.6,'P','huevo',50],
-    ['huevofrito','Huevo frito o revuelto (con aceite)',196,13.6,.8,15,'P','huevo',50],
+    ['huevo','Huevo cocido',155,12.6,1.1,10.6,'P','huevo',50,0,200],
+    ['huevofrito','Huevo frito o revuelto (con aceite)',196,13.6,.8,15,'P','huevo',50,0,200],
     ['leche','Leche semidescremada (ml)',46,3.2,4.8,1.6,'F','vaso',250,250],
     ['pan','Pan tajado blanco',260,9,48,3.5,'C','tajada',27],
     ['panint','Pan tajado integral',250,12,43,3.5,'C','tajada',28],
@@ -30,7 +30,7 @@
     ['pollo','Pechuga de pollo cocida',165,31,0,3.6,'P'],
     ['pollopierna','Pierna/contramuslo de pollo (sin hueso)',215,26,0,12,'P'],
     ['pollomolido','Pollo molido cocido',190,23,0,10,'P'],
-    ['sardina','Sardinas en salsa de tomate',186,21,.7,10.5,'P','sardina',85],
+    ['sardina','Sardinas en salsa de tomate',186,21,.7,10.5,'P','sardina',85,0,255],
     ['atun','Atún en agua (escurrido)',116,26,0,.8,'P','lata',120],
     ['atunac','Atún en aceite (escurrido)',198,29,0,8,'P','lata',120],
     ['cerdo','Cerdo (lomo/filete) cocido',200,28,0,9,'P'],
@@ -38,8 +38,8 @@
     ['molida','Carne molida cocida',250,26,0,15,'P'],
     ['res','Carne de res magra cocida',215,27,0,11,'P'],
     ['chorizo','Chorizo antioqueño',250,14,3,20,'F','chorizo',63,63],
-    ['queso','Queso campesino',270,18,3,21,'P','tajada',30],
-    ['mozzarella','Queso mozzarella',300,22,2,22,'P','tajada',20],
+    ['queso','Queso campesino',270,18,3,21,'P','tajada',30,0,90],
+    ['mozzarella','Queso mozzarella',300,22,2,22,'P','tajada',20,0,60],
     ['chocolate','Chocolate de mesa (pastilla)',480,4,80,16,'F','pastilla',25,25],
     ['aguapanela','Aguapanela (ml)',50,0,13,0,'F','vaso',250,250],
     ['hogao','Hogao',90,1.5,8,6,'G','cucharada',15,30],
@@ -58,12 +58,12 @@
     ['gelatina','Gelatina cero',8,1.5,.5,0,'F','vaso',120,120],
     ['croissant','Croissant',406,8,46,21,'C','croissant',60],
     ['clara','Clara de huevo',52,11,.7,.2,'P','clara',33],
-    ['whey','Proteína en polvo',400,80,8,6,'P','scoop',30],
+    ['whey','Proteína en polvo',400,80,8,6,'P','scoop',30,0,60],
     ['yogur','Yogur griego natural',97,9,4,5,'P'],
     ['aguacate','Aguacate',160,2,8.5,14.7,'G',null,null,50],
     ['aceite','Aceite',884,0,0,100,'G','cucharada',13,5],
     ['mani','Mantequilla de maní',588,25,20,50,'G','cucharada',16,16],
-  ].map(a=>({id:a[0],n:a[1],k:a[2],p:a[3],c:a[4],f:a[5],r:a[6],u:a[7]||'',ug:a[8]||0,dg:a[9]||0}));
+  ].map(a=>({id:a[0],n:a[1],k:a[2],p:a[3],c:a[4],f:a[5],r:a[6],u:a[7]||'',ug:a[8]||0,dg:a[9]||0,mx:a[10]||400}));
   const V8622_ROLE={P:'🍗 Proteína',C:'🍚 Carbohidrato',V:'🥗 Verdura',G:'🥑 Grasa',F:'📌 Fijo'};
   let v8622St=null;
 
@@ -114,7 +114,7 @@
         for(const r of Ps){
           let g=(needP/Ps.length)/(r.f.p/100);
           if(g*r.f.k/100>capK/Ps.length)g=(capK/Ps.length)/(r.f.k/100);
-          r.g=snapP(r.f,Math.min(g,400));const o=v8622Of(r.f,r.g);k+=o.k;p+=o.p;
+          r.g=Math.min(snapP(r.f,Math.min(g,r.f.mx||400)),r.f.mx||400);const o=v8622Of(r.f,r.g);k+=o.k;p+=o.p;
         }
       }
       carbP=0;
@@ -138,19 +138,35 @@
       <div class="v8622-tr"><i class="b" style="width:${pc(bIn)}%"></i><i class="m" style="width:${pc(mIn)}%"></i><i class="o" style="width:${pc(over)}%"></i>${over?`<em style="left:${pc(goal)}%"></em>`:''}</div>
       <div class="v8622-bs"><span>Antes ${before} · esta comida +${meal}</span><span class="${rest<0?'ov':rest===0?'ok':''}">${rest>0?`Faltan ${rest} ${u}`:rest===0?'Meta cumplida':`Te pasas ${-rest} ${u}`}</span></div></div>`;
   }
+  // Al meter o quitar un alimento se vuelve a repartir todo lo que no esté 🔒 fijo (lo que cambiaste a mano también se suelta),
+  // para comer variado sin pasarse: los carbohidratos se reparten entre sí por calorías y las proteínas por proteína.
+  // S.chg = {id, how, prev:{id:gramos antes}} → cada fila dice cuánto baja o sube.
+  function v8622Redist(fn,id,how){
+    const S=v8622St,prev={};S.rows.forEach(r=>{prev[r.id]=Number(r.g)||0});
+    fn();S.rows.forEach(r=>{if(!r.lock)r.manual=false});v8622Plan();
+    S.chg=Object.keys(prev).length&&(how==='del'||S.rows.length>1)?{id,how,prev}:null;
+  }
+  function v8622ChgHtml(){
+    const S=v8622St,c=S.chg;if(!c)return '';const f=v8622Food(c.id);if(!f)return '';
+    const L=S.rows.filter(r=>r.id!==c.id&&c.prev[r.id]!==undefined).map(r=>{const d=Math.round((r.g||0)-c.prev[r.id]);return d?`${esc(v8622Food(r.id)?.n||'')} <b>${d<0?'−':'+'}${Math.abs(d)} g</b>`:''}).filter(Boolean);
+    if(c.how==='add'){const r=S.rows.find(x=>x.id===c.id);return `<div class="v8622-chg">Para meter <b>${esc(f.n)}</b> (${Math.round(r?.g||0)} g): ${L.length?L.join(' · '):'no hubo que bajar nada'}.</div>`}
+    return `<div class="v8622-chg">Quitaste <b>${esc(f.n)}</b>: ${L.length?L.join(' · '):'lo demás queda igual'}.</div>`;
+  }
   function v8622Html(){
     const S=v8622St,B=S.B||v8622Budget(S.type,S.date,S.editId),T=v8622Tot();
     const q=v8622Norm(S.q),list=v8622Foods().filter(f=>!S.rows.some(r=>r.id===f.id)&&(!q||v8622Norm(f.n).includes(q)));
     const rows=S.rows.map(r=>{const f=v8622Food(r.id);if(!f)return '';const o=v8622Of(f,r.g||0);
-      return `<div class="v8622-row"><div class="nm"><b>${esc(f.n)}</b><small>${V8622_ROLE[f.r]||''}${r.manual?' · lo pesaste':''}</small></div>
+      const ch=S.chg,pg=ch?ch.prev[r.id]:undefined,dg=pg===undefined?null:Math.round((r.g||0)-pg);
+      const dHtml=!ch?'':r.id===ch.id?'<span class="v8622-d nw">nuevo</span>':dg?`<span class="v8622-d ${dg<0?'dn':'up'}">${dg<0?'↓ baja':'↑ sube'} ${Math.abs(dg)} g <small>(antes ${Math.round(pg)})</small></span>`:'';
+      return `<div class="v8622-row${r.lock?' lk':''}"><div class="nm"><b>${esc(f.n)}</b><small>${V8622_ROLE[f.r]||''}${r.lock?' · 🔒 fijo':r.manual?' · lo cambiaste':''}</small>${dHtml}</div>
       <div class="gr"><button class="secondary" data-v8622-step="${esc(r.id)}" data-d="-1">−</button><input type="number" inputmode="numeric" min="0" step="5" value="${Math.round(r.g||0)}" data-v8622-g="${esc(r.id)}"><span>g</span><button class="secondary" data-v8622-step="${esc(r.id)}" data-d="1">＋</button></div>
-      <div class="kc">${Math.round(o.k)} kcal · ${Math.round(o.p)} g prot${esc(v8622Units(f,r.g))}</div><button class="v8622-x" data-v8622-del="${esc(r.id)}" aria-label="Quitar">✕</button></div>`}).join('');
+      <div class="kc">${Math.round(o.k)} kcal · ${Math.round(o.p)} g prot${esc(v8622Units(f,r.g))}</div><button class="v8622-x" data-v8622-del="${esc(r.id)}" aria-label="Quitar">✕</button><button class="v8622-x v8622-lk" data-v8622-lock="${esc(r.id)}" aria-label="Fijar">${r.lock?'🔒':'🔓'}</button></div>`}).join('');
     return `<div class="v8622p"><div class="v8622-h"><h2>⚖️ Pesar comida</h2><button class="v8622-x" data-v8622-close aria-label="Cerrar">✕</button></div>
       <div class="seg2 meal-tabs">${Object.entries(MEAL_TYPES).map(([k,v])=>`<button type="button" class="${S.type===k?'on':''}" data-v8622-type="${k}">${v}</button>`).join('')}</div>
       <div class="v8622-bars">${v8622Bar('🔥 Calorías',B.usedK,T.k,B.K,'kcal')}${v8622Bar('🍗 Proteína',B.usedP,T.p,B.P,'g')}
       <div class="v8622-leg"><span><i class="b"></i>Antes de esta comida</span><span><i class="m"></i>Esta comida</span>${B.estN?`<span>· ${B.estN} comida${B.estN>1?'s':''} sin kcal: estimada${B.estN>1?'s':''}</span>`:''}</div>
       <div class="v8622-sug">Sugerido para esta comida: <b>${B.k} kcal · ${B.p} g prot</b></div></div>
-      ${S.rows.length?`<div class="v8622-list">${rows}</div>
+      ${S.rows.length?`${v8622ChgHtml()}<div class="v8622-list">${rows}</div>
       <div class="row v8622-act"><button class="secondary" data-v8622-auto>↺ Recalcular</button><button class="primary" data-v8622-save>${S.editId?'Guardar cambios':'✓ Ya lo pesé, guardar'}</button></div>
       <p class="small">Pesa todo como se come (arroz y carne ya cocidos, atún escurrido). Si sirves otra cantidad, escríbela: lo demás se reajusta.</p>`
       :`<p class="small" style="margin:12px 0 4px">Elige lo que vas a comer y te digo cuántos gramos servir de cada cosa.</p>`}
@@ -206,6 +222,10 @@
       .v8622-row{position:relative;display:grid;grid-template-columns:1fr auto;gap:4px 8px;align-items:center;background:var(--panel2);border:1px solid var(--line);border-radius:14px;padding:10px 40px 10px 12px}
       .v8622-row .nm b{display:block;font-size:14px;line-height:1.25}.v8622-row .nm small,.v8622-row .kc{font-size:11.5px;color:var(--muted)}
       .v8622-row .kc{grid-column:1/-1}.v8622-row .v8622-x{position:absolute;top:8px;right:8px;width:26px;height:26px;font-size:12px}
+      .v8622-row .v8622-lk{top:40px;font-size:12px}.v8622-row.lk{border-color:#60a5fa66}
+      .v8622-d{display:inline-block;margin-top:4px;font-size:12px;font-weight:700;padding:2px 8px;border-radius:8px;background:var(--panel)}
+      .v8622-d.dn{color:var(--orange,#f59e0b)}.v8622-d.up{color:#60a5fa}.v8622-d.nw{color:var(--green)}.v8622-d small{font-weight:400;color:var(--muted)}
+      .v8622-chg{margin:0 0 10px;padding:9px 12px;border-radius:12px;background:var(--panel2);border-left:4px solid var(--green);font-size:13px;line-height:1.45}
       .v8622-row .gr{display:flex;align-items:center;gap:4px}.v8622-row .gr button{margin:0;min-width:0;width:34px;height:38px;padding:0}
       .v8622-row .gr input{width:70px;height:38px;margin:0;text-align:center;font-size:18px;font-weight:800;padding:4px}.v8622-row .gr span{font-size:12px;color:var(--muted)}
       .v8622-tot{margin-top:10px;padding:10px 12px;border-radius:12px;display:flex;flex-direction:column;gap:2px;background:var(--panel2);border-left:4px solid var(--green)}
@@ -236,10 +256,11 @@
       const S=v8622St,t=e.target;
       if(t===o||t.closest('[data-v8622-close]')){v8622Close();return}
       const ty=t.closest('[data-v8622-type]');if(ty){S.type=ty.dataset.v8622Type;if(!S.rows.length)S.rows=(v8622Cfg().last[S.type]||[]).filter(id=>v8622Food(id)).map(id=>({id,g:0}));v8622Recalc();return}
-      const ad=t.closest('[data-v8622-add]');if(ad){S.rows.push({id:ad.dataset.v8622Add,g:0});S.q='';v8622Recalc();return}
-      const dl=t.closest('[data-v8622-del]');if(dl){S.rows=S.rows.filter(r=>r.id!==dl.dataset.v8622Del);v8622Recalc();return}
-      const st=t.closest('[data-v8622-step]');if(st){const r=S.rows.find(x=>x.id===st.dataset.v8622Step),f=v8622Food(r?.id);if(r&&f){const s=f.ug||(f.r==='G'?5:10);r.g=Math.max(0,(Number(r.g)||0)+s*Number(st.dataset.d));r.manual=true;v8622Recalc()}return}
-      if(t.closest('[data-v8622-auto]')){S.rows.forEach(r=>{r.manual=false});v8622Recalc();return}
+      const ad=t.closest('[data-v8622-add]');if(ad){const id=ad.dataset.v8622Add;v8622Redist(()=>S.rows.push({id,g:0}),id,'add');S.q='';v8622Render();return}
+      const dl=t.closest('[data-v8622-del]');if(dl){const id=dl.dataset.v8622Del;v8622Redist(()=>{S.rows=S.rows.filter(r=>r.id!==id)},id,'del');v8622Render();return}
+      const lk=t.closest('[data-v8622-lock]');if(lk){const r=S.rows.find(x=>x.id===lk.dataset.v8622Lock);if(r){r.lock=!r.lock;r.manual=r.lock;S.chg=null;v8622Recalc()}return}
+      const st=t.closest('[data-v8622-step]');if(st){const r=S.rows.find(x=>x.id===st.dataset.v8622Step),f=v8622Food(r?.id);if(r&&f){const s=f.ug||(f.r==='G'?5:10);r.g=Math.max(0,(Number(r.g)||0)+s*Number(st.dataset.d));r.manual=true;S.chg=null;v8622Recalc()}return}
+      if(t.closest('[data-v8622-auto]')){S.rows.forEach(r=>{r.manual=false;r.lock=false});S.chg=null;v8622Recalc();return}
       if(t.closest('[data-v8622-save]')){v8622Save();return}
       if(t.closest('[data-v8622-mine]')){
         const n=($('#v8622N')?.value||'').trim(),k=Number(String($('#v8622K')?.value).replace(',','.')),p=Number(String($('#v8622P')?.value).replace(',','.'))||0,r=$('#v8622R')?.value||'C';
@@ -248,7 +269,7 @@
     });
     document.addEventListener('change',e=>{
       const i=e.target.closest?.('[data-v8622-g]');if(!i||!v8622St)return;
-      const r=v8622St.rows.find(x=>x.id===i.dataset.v8622G);if(!r)return;r.g=Math.max(0,Number(i.value)||0);r.manual=true;v8622Recalc();
+      const r=v8622St.rows.find(x=>x.id===i.dataset.v8622G);if(!r)return;r.g=Math.max(0,Number(i.value)||0);r.manual=true;v8622St.chg=null;v8622Recalc();
     });
     document.addEventListener('input',e=>{
       if(e.target.id!=='v8622Q'||!v8622St)return;v8622St.q=e.target.value;
