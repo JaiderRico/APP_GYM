@@ -23,6 +23,7 @@ import java.util.Locale;
  * Ganchos en smali (classes3, RestAlarm): onReceive llama hold(this) antes de deliver y release() después
  * (goAsync mantiene el teléfono despierto mientras habla); deliver llama due(ctx) cuando de verdad termina el descanso
  * (también cuando la página llama finishRest con la app abierta).
+ * (8.6.20) Cuando habla, el aviso del fin del descanso sale sin sonido (channelId): solo vibración y voz.
  * Usa audio de "guía" y pide foco transitorio con atenuación: la música baja mientras habla y sigue después.
  */
 public final class Speak {
@@ -32,6 +33,8 @@ public final class Speak {
     private static BroadcastReceiver.PendingResult sPending = null;
     private static boolean sStarted = false;
     private static TextToSpeech sTts = null;
+    private static boolean sVoice = false; // (8.6.20) el aviso de este descanso va sin sonido: solo la voz
+    static final String LOUD = "rest_finished_loud_v711", QUIET = "rest_voice_v8620";
     private static final Handler H = new Handler(Looper.getMainLooper());
 
     public static boolean handles(String key) { return "__speak__".equals(key); }
@@ -65,14 +68,56 @@ public final class Speak {
             if (text == null || text.trim().length() == 0) return;
             p.edit().putString("text", "").apply(); // una sola vez por descanso
             sStarted = true;
-            say(ctx.getApplicationContext(), text, 1600); // deja sonar primero la alarma
+            sVoice = true;
+            say(ctx.getApplicationContext(), text, 250); // 8.6.20: sin alarma, la voz arranca de una
         } catch (Throwable ignored) { }
+    }
+
+    /**
+     * (8.6.20) Desde RestAlarm.deliver, en vez del texto fijo del canal: si la voz va a hablar, el aviso sale por un
+     * canal sin sonido (solo vibra), para que la alarma no tape la voz.
+     */
+    public static String channelId(Context ctx) {
+        if (!sVoice) return LOUD;
+        sVoice = false;
+        try {
+            // NotificationChannel es API 26: por reflexión (se compila contra android-23).
+            Object nm = ctx.getSystemService(Context.NOTIFICATION_SERVICE);
+            Class<?> nmc = nm.getClass();
+            Class<?> chc = Class.forName("android.app.NotificationChannel");
+            if (nmc.getMethod("getNotificationChannel", String.class).invoke(nm, QUIET) == null) {
+                Object ch = chc.getConstructor(String.class, CharSequence.class, int.class)
+                        .newInstance(QUIET, "Fin del descanso (con voz)", 4); // IMPORTANCE_HIGH
+                chc.getMethod("setSound", android.net.Uri.class, AudioAttributes.class).invoke(ch, null, null);
+                chc.getMethod("enableVibration", boolean.class).invoke(ch, true);
+                chc.getMethod("setVibrationPattern", long[].class).invoke(ch, (Object) new long[]{0, 250, 120, 250});
+                chc.getMethod("setDescription", String.class).invoke(ch, "Aviso sin sonido cuando la app dice la siguiente serie en voz alta");
+                nmc.getMethod("createNotificationChannel", chc).invoke(nm, ch);
+            }
+            return QUIET;
+        } catch (Throwable t) { return LOUD; }
     }
 
     private static void finishPending() {
         BroadcastReceiver.PendingResult pr = sPending;
         sPending = null;
         if (pr != null) { try { pr.finish(); } catch (Throwable ignored) { } }
+    }
+
+    /** (8.6.20) Si la voz falla (sin motor o sin español), suena la alarma de siempre para no quedar en silencio. */
+    private static void fallbackAlarm(Context app) {
+        try {
+            android.net.Uri u = android.net.Uri.parse("android.resource://" + app.getPackageName() + "/raw/rest_alarm");
+            final android.media.MediaPlayer mp = new android.media.MediaPlayer();
+            mp.setAudioAttributes(new AudioAttributes.Builder().setUsage(AudioAttributes.USAGE_ALARM)
+                    .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION).build());
+            mp.setDataSource(app, u);
+            mp.setOnCompletionListener(new android.media.MediaPlayer.OnCompletionListener() {
+                @Override public void onCompletion(android.media.MediaPlayer m) { try { m.release(); } catch (Throwable ignored) { } }
+            });
+            mp.prepare();
+            mp.start();
+        } catch (Throwable ignored) { }
     }
 
     private static void say(final Context app, final String text, final long delay) {
@@ -94,11 +139,12 @@ public final class Speak {
                 final long t0 = System.currentTimeMillis();
                 sTts = new TextToSpeech(app, new TextToSpeech.OnInitListener() {
                     @Override public void onInit(int status) {
-                        if (status != TextToSpeech.SUCCESS || sTts == null) { H.removeCallbacks(done); done.run(); return; }
+                        if (status != TextToSpeech.SUCCESS || sTts == null) { fallbackAlarm(app); H.removeCallbacks(done); H.postDelayed(done, 4000); return; }
                         final TextToSpeech t = sTts;
                         try {
                             int r = t.setLanguage(new Locale("es", "CO"));
-                            if (r < 0) t.setLanguage(new Locale("es"));
+                            if (r < 0) r = t.setLanguage(new Locale("es"));
+                            if (r < 0) { fallbackAlarm(app); H.removeCallbacks(done); H.postDelayed(done, 4000); return; }
                         } catch (Throwable ignored) { }
                         try {
                             t.setAudioAttributes(new AudioAttributes.Builder()
@@ -109,7 +155,7 @@ public final class Speak {
                         t.setOnUtteranceProgressListener(new UtteranceProgressListener() {
                             @Override public void onStart(String id) { }
                             @Override public void onDone(String id) { H.removeCallbacks(done); H.postDelayed(done, 300); }
-                            @Override public void onError(String id) { H.removeCallbacks(done); H.post(done); }
+                            @Override public void onError(String id) { fallbackAlarm(app); H.removeCallbacks(done); H.postDelayed(done, 4000); }
                         });
                         long wait = Math.max(0, delay - (System.currentTimeMillis() - t0));
                         H.postDelayed(new Runnable() {

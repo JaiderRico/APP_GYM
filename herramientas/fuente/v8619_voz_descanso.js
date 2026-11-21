@@ -65,7 +65,7 @@
   function v8619SetHtml(){
     const P=v8619Prefs();
     return `<details class="settings-group" id="v8619Set"><summary>🔊 Voz al terminar el descanso</summary><div class="settings-section">
-      <p class="small" style="margin:0 0 10px">Cuando suena el final del descanso, el teléfono dice la siguiente serie: ejercicio, peso y cuántas repeticiones buscas. Funciona con la pantalla apagada o en otra app; la música baja mientras habla.</p>
+      <p class="small" style="margin:0 0 10px">Al terminar el descanso, en vez de la alarma, el teléfono dice la siguiente serie: ejercicio, peso y cuántas repeticiones buscas (y vibra). Funciona con la pantalla apagada o en otra app; la música baja mientras habla. Si la apagas, vuelve la alarma de siempre.</p>
       <label class="toggle-row"><input type="checkbox" data-v8619="on" ${P.on?'checked':''}> Decir la siguiente serie</label>
       <label class="toggle-row"><input type="checkbox" data-v8619="load" ${P.load?'checked':''}> Incluir el peso</label>
       <label class="toggle-row"><input type="checkbox" data-v8619="rir" ${P.rir?'checked':''}> Incluir el RIR</label>

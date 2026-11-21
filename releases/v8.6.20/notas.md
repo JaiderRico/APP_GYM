@@ -1,0 +1,1 @@
+- 🔊 Al terminar el descanso suena solo la voz con la siguiente serie (y vibra); la alarma ya no la tapa. Si la voz se apaga o falla, vuelve la alarma
