@@ -1,0 +1,1 @@
+- ⚖️ Pesar comida: tus alimentos de siempre primero y calorías revisadas (huevo, leche semidescremada, pan, fríjoles, arepa, sardinas, fideos, chocolate…)
