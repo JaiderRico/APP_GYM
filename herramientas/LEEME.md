@@ -147,6 +147,10 @@
   Desde 8.6.20 cuando habla **no suena la alarma**: en `deliver` el `const-string v7, "rest_finished_loud_v711"` del
   `Notification.Builder` se cambió por `Speak.channelId(ctx)`, que devuelve el canal sin sonido `rest_voice_v8620` (solo
   vibra) si `due` arrancó la voz. Si el motor de voz falla o no hay español, `fallbackAlarm` reproduce `raw/rest_alarm`.
+- `fuente/v8626_sin_comida.js` (8.6.26, **solo app de Jaider**; justo antes de `initV7();`, al final): Jaider pidió quitar Comida.
+  Esconde la pestaña, `go('food')` → Resumen, «Hoy» muestra solo la creatina, apaga recordatorios de comidas y el bloqueo
+  de v940 (`v94LockDay=()=>null`). Los datos de comidas no se borran. **v8622 (pesar comida) se sacó del index** en 8.6.26
+  (el archivo queda como referencia). Para volver a Comida: `data.settings.foodOff=false` y volver a pegar los bloques.
 - `fuente/v8622_pesar_comida.js` (8.6.22, **solo app de Jaider**; la libre lo trae apagado por `MP_PUBLICA`/`V88_APP`; justo
   antes de `initV7();`, después de v8619): Comida → «⚖️ Pesar comida» (ventana `#v8622`, role=dialog para que v88 la cierre con
   volver). La primera vez fija `data.settings.nutritionGoals` en 2400 kcal / 140 g (copia anterior en `settings.v8622.prev`).

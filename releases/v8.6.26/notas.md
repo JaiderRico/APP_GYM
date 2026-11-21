@@ -1,0 +1,1 @@
+- 🍽 Se quitó la sección de Comida (y su bloqueo y recordatorios); en Resumen queda la creatina para marcarla
