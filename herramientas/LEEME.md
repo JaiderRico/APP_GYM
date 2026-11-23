@@ -151,6 +151,13 @@
   Esconde la pestaña, `go('food')` → Resumen, «Hoy» muestra solo la creatina, apaga recordatorios de comidas y el bloqueo
   de v940 (`v94LockDay=()=>null`). Los datos de comidas no se borran. **v8622 (pesar comida) se sacó del index** en 8.6.26
   (el archivo queda como referencia). Para volver a Comida: `data.settings.foodOff=false` y volver a pegar los bloques.
+- `fuente/v8627_lugares.js` (8.6.27, **solo app de Jaider**; justo antes de `initV7();`, al final, después de v8626): lugares de
+  entreno editables. `data.settings.places=[{id,name,icon,days:[1..7 como dayOf],off?}]` (se crea desde `placeNames`; los ids
+  `''` y `'U'` se conservan porque el historial guarda `st.station`/`ex.station`; los nuevos son `'p'+uid()`). Reemplaza
+  `placeLabel` y `renderPlaceSeg` y pone su propio clic (captura) en `#placeSeg`; ✎ abre la ventana `#v8627` (también
+  Ajustes → Entreno → «📍 Lugares de entreno»): crear, nombre, ícono, días en que se elige solo (un día = un lugar),
+  ordenar ↑↓ y borrar. Borrar con registros: `v8627Move(de,a)` pasa las series (y `profiles[].station`) a otro lugar, o
+  `off:true` lo esconde dejando el historial con su nombre. `groupLabel` (Logros) ahora usa `placeLabel`.
 - `fuente/v8622_pesar_comida.js` (8.6.22, **solo app de Jaider**; la libre lo trae apagado por `MP_PUBLICA`/`V88_APP`; justo
   antes de `initV7();`, después de v8619): Comida → «⚖️ Pesar comida» (ventana `#v8622`, role=dialog para que v88 la cierre con
   volver). La primera vez fija `data.settings.nutritionGoals` en 2400 kcal / 140 g (copia anterior en `settings.v8622.prev`).

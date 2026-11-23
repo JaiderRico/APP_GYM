@@ -1,0 +1,3 @@
+- 📍 Lugares de entreno: crea, edita (nombre, ícono y días), ordena y borra los lugares donde entrenas
+- 🗑 Al borrar un lugar con registros: pasarlos a otro lugar o solo esconderlo
+- 🏆 Logros muestra el nombre del lugar en vez de «U»
