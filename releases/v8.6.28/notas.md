@@ -1,0 +1,1 @@
+- ✎ El lápiz de los lugares abre directo la lista de lugares (ya no sale primero la ventanita vieja de cambiar nombre)

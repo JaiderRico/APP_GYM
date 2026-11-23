@@ -45,7 +45,9 @@
       +`<button type="button" class="place-edit" data-place-edit aria-label="Lugares de entreno">✎</button>`;
   };
   // Un solo manejador (captura) para elegir y para ✎; los de antes no se ejecutan.
-  $('#placeSeg')?.addEventListener('click',e=>{
+  // En document (captura) para correr ANTES que los manejadores viejos de #placeSeg (el ✎ de v7.6 abría prompt()).
+  document.addEventListener('click',e=>{
+    if(!e.target.closest?.('#placeSeg'))return;
     const ed=e.target.closest('[data-place-edit]'),b=e.target.closest('[data-place]');
     if(!ed&&!b)return;e.stopPropagation();e.preventDefault();
     if(ed){v8627Open();return}
