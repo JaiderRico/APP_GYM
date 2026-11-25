@@ -158,6 +158,14 @@
   Ajustes → Entreno → «📍 Lugares de entreno»): crear, nombre, ícono, días en que se elige solo (un día = un lugar),
   ordenar ↑↓ y borrar. Borrar con registros: `v8627Move(de,a)` pasa las series (y `profiles[].station`) a otro lugar, o
   `off:true` lo esconde dejando el historial con su nombre. `groupLabel` (Logros) ahora usa `placeLabel`.
+- **8.6.29 (las tres apps)**: al terminar la última serie de un ejercicio (y al quitar una serie pendiente) el siguiente es
+  `nextPendingRef()` = el **primer pendiente de la lista**, no el siguiente por posición (antes, «Hacer ahora» con uno de
+  abajo hacía saltar los de arriba). Posponer, Saltar y «Máquina ocupada» no cambian (siguen mandando el ejercicio al final).
+  La de Ella y la libre se armaron **desde su propia 8.6.12** (no se regeneró la libre desde la de Jaider, porque traería los
+  bloques 8.6.13–8.6.28 que son solo de Jaider): se editó `trabajo/libre/assets/index.html` y se usaron `subir_version` +
+  `armar` de mp.py con la base de cada una. Solo Jaider: `Speak.java` pide el foco con `AudioFocusRequest` (API 26+, por
+  reflexión, atributos de guía/habla) ~450 ms antes de hablar y lo suelta con `abandonAudioFocusRequest`, para que Spotify y
+  similares sí bajen la música; classes7.dex se rearmó cambiando solo los `Speak*.smali`.
 - `fuente/v8622_pesar_comida.js` (8.6.22, **solo app de Jaider**; la libre lo trae apagado por `MP_PUBLICA`/`V88_APP`; justo
   antes de `initV7();`, después de v8619): Comida → «⚖️ Pesar comida» (ventana `#v8622`, role=dialog para que v88 la cierre con
   volver). La primera vez fija `data.settings.nutritionGoals` en 2400 kcal / 140 g (copia anterior en `settings.v8622.prev`).

@@ -25,6 +25,7 @@ import java.util.Locale;
  * (también cuando la página llama finishRest con la app abierta).
  * (8.6.20) Cuando habla, el aviso del fin del descanso sale sin sonido (channelId): solo vibración y voz.
  * Usa audio de "guía" y pide foco transitorio con atenuación: la música baja mientras habla y sigue después.
+ * (8.6.29) El foco se pide con AudioFocusRequest (API 26+) y ~0,45 s antes de hablar, para que la música sí baje.
  */
 public final class Speak {
     private Speak() { }
@@ -120,6 +121,53 @@ public final class Speak {
         } catch (Throwable ignored) { }
     }
 
+    /** (8.6.29) Tiempo entre pedir que baje la música y empezar a hablar (la atenuación tarda unos ms). */
+    private static final long DUCK_LEAD_MS = 450;
+    private static Object sFocusReq = null; // AudioFocusRequest (API 26+), guardado para soltarlo después
+
+    /**
+     * (8.6.29) Pide foco "transitorio con atenuación" con la API moderna (AudioFocusRequest, API 26+) y los mismos
+     * atributos de la voz (guía de navegación / habla), como hacen las apps de mapas: así Android y las apps de música
+     * (Spotify, YouTube Music…) bajan el volumen mientras habla. La API vieja (por STREAM_MUSIC) la ignoran varias apps.
+     * Se usa por reflexión porque se compila contra android-23. Si falla, usa la forma vieja.
+     */
+    private static void requestDuck(AudioManager am, AudioManager.OnAudioFocusChangeListener fl) {
+        if (am == null) return;
+        sFocusReq = null;
+        if (android.os.Build.VERSION.SDK_INT >= 26) {
+            try {
+                AudioAttributes aa = new AudioAttributes.Builder()
+                        .setUsage(AudioAttributes.USAGE_ASSISTANCE_NAVIGATION_GUIDANCE)
+                        .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH).build();
+                Class<?> bc = Class.forName("android.media.AudioFocusRequest$Builder");
+                Object b = bc.getConstructor(int.class).newInstance(AudioManager.AUDIOFOCUS_GAIN_TRANSIENT_MAY_DUCK);
+                bc.getMethod("setAudioAttributes", AudioAttributes.class).invoke(b, aa);
+                bc.getMethod("setOnAudioFocusChangeListener", AudioManager.OnAudioFocusChangeListener.class, Handler.class).invoke(b, fl, H);
+                Object req = bc.getMethod("build").invoke(b);
+                Class<?> rc = Class.forName("android.media.AudioFocusRequest");
+                am.getClass().getMethod("requestAudioFocus", rc).invoke(am, req);
+                sFocusReq = req;
+                return;
+            } catch (Throwable ignored) { sFocusReq = null; }
+        }
+        try { am.requestAudioFocus(fl, AudioManager.STREAM_MUSIC, AudioManager.AUDIOFOCUS_GAIN_TRANSIENT_MAY_DUCK); }
+        catch (Throwable ignored) { }
+    }
+
+    private static void abandonFocus(AudioManager am, AudioManager.OnAudioFocusChangeListener fl) {
+        if (am == null) return;
+        Object req = sFocusReq;
+        sFocusReq = null;
+        if (req != null) {
+            try {
+                Class<?> rc = Class.forName("android.media.AudioFocusRequest");
+                am.getClass().getMethod("abandonAudioFocusRequest", rc).invoke(am, req);
+                return;
+            } catch (Throwable ignored) { }
+        }
+        try { am.abandonAudioFocus(fl); } catch (Throwable ignored) { }
+    }
+
     private static void say(final Context app, final String text, final long delay) {
         final AudioManager am = (AudioManager) app.getSystemService(Context.AUDIO_SERVICE);
         final AudioManager.OnAudioFocusChangeListener fl = new AudioManager.OnAudioFocusChangeListener() {
@@ -127,7 +175,7 @@ public final class Speak {
         };
         final Runnable done = new Runnable() {
             @Override public void run() {
-                try { if (am != null) am.abandonAudioFocus(fl); } catch (Throwable ignored) { }
+                abandonFocus(am, fl);
                 try { if (sTts != null) { sTts.shutdown(); sTts = null; } } catch (Throwable ignored) { }
                 finishPending();
             }
@@ -156,19 +204,21 @@ public final class Speak {
                         t.setSpeechRate(1.0f);
                         t.setOnUtteranceProgressListener(new UtteranceProgressListener() {
                             @Override public void onStart(String id) { }
-                            @Override public void onDone(String id) { H.removeCallbacks(done); H.postDelayed(done, 300); }
+                            @Override public void onDone(String id) { H.removeCallbacks(done); H.postDelayed(done, 600); }
                             @Override public void onError(String id) { fallbackAlarm(app); H.removeCallbacks(done); H.postDelayed(done, 4000); }
                         });
                         long wait = Math.max(0, delay - (System.currentTimeMillis() - t0));
                         H.postDelayed(new Runnable() {
                             @Override public void run() {
-                                try {
-                                    if (am != null) am.requestAudioFocus(fl, AudioManager.STREAM_MUSIC,
-                                            AudioManager.AUDIOFOCUS_GAIN_TRANSIENT_MAY_DUCK);
-                                } catch (Throwable ignored) { }
-                                Bundle b = new Bundle();
-                                try { t.speak(text, TextToSpeech.QUEUE_FLUSH, b, "mp_rest"); }
-                                catch (Throwable e) { H.removeCallbacks(done); H.post(done); }
+                                // 8.6.29: pide que la música baje y espera un momento a que alcance a bajar antes de hablar.
+                                requestDuck(am, fl);
+                                H.postDelayed(new Runnable() {
+                                    @Override public void run() {
+                                        Bundle b = new Bundle();
+                                        try { t.speak(text, TextToSpeech.QUEUE_FLUSH, b, "mp_rest"); }
+                                        catch (Throwable e) { H.removeCallbacks(done); H.post(done); }
+                                    }
+                                }, DUCK_LEAD_MS);
                             }
                         }, wait);
                     }

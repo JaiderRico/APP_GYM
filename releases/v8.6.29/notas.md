@@ -1,0 +1,2 @@
+- Arreglo: al terminar un ejercicio hecho fuera de orden («Hacer ahora»), la app lleva al primer pendiente de la lista y ya no se salta los de arriba. Posponer, Saltar y «Máquina ocupada» siguen igual.
+- (Mi Progreso) La música baja de volumen mientras la voz dice la siguiente serie (foco de audio moderno, como las apps de mapas).
