@@ -1,5 +1,12 @@
 # Cómo modificar Mi Progreso (guía para Claude u otra persona)
 
+## ⚠️ Hasta nuevo aviso (desde 2026-11-25, después de 8.6.29): solo se actualiza la app de Jaider
+Jaider pidió que **solo su versión (Mi Progreso) reciba actualizaciones**. **Mi Progreso Ella** y **Mi Progreso Libre** quedan
+**obsoletas** en 8.6.29: no les apliques cambios ni publiques versiones nuevas de ellas hasta que Jaider diga lo contrario.
+Para publicar: `mp.py extraer` y `mp.py publicar` exigen la APK de Ella de la versión base, así que corre `publicar` con
+`mp.APPS` reducido a `{'jaider': ...}` (como en 8.6.13–8.6.28) y **no** corras `mp.py libre`. Lo de abajo sobre "tres apps"
+vale solo cuando Jaider las vuelva a activar.
+
 ## Qué hay aquí
 **Son TRES apps** y cada cambio va en las tres, salvo que se pida otra cosa: **Mi Progreso** (Jaider), **Mi Progreso Ella** y
 **Mi Progreso Libre** (pública). En cada versión: `mp.py publicar` (Jaider + Ella) **y** `mp.py libre` con el mismo número.
