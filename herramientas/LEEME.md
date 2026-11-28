@@ -186,6 +186,9 @@ vale solo cuando Jaider las vuelva a activar.
   y `renderFocus`. No hay claves de datos nuevas.
   8.6.31: en esa lista el estado «x/y series» cuenta solo series efectivas y aparte «· N de calentamiento» (antes sumaba
   los calentamientos: 3 + 2 salía como 5).
+  8.6.32: progreso protegido. En pleno entreno `v8630Remove` nunca borra series hechas: terminado → no se quita (la lista
+  muestra «✓ Hecho · guardado»), a medias → «Quitar lo que falta» (solo pendientes). `removeExerciseDuringWorkout`
+  («Quitar próximo ejercicio» de las opciones) ahora pasa por `v8630Remove`. Antes de empezar (setup) se quita normal.
 - `fuente/v8622_pesar_comida.js` (8.6.22, **solo app de Jaider**; la libre lo trae apagado por `MP_PUBLICA`/`V88_APP`; justo
   antes de `initV7();`, después de v8619): Comida → «⚖️ Pesar comida» (ventana `#v8622`, role=dialog para que v88 la cierre con
   volver). La primera vez fija `data.settings.nutritionGoals` en 2400 kcal / 140 g (copia anterior en `settings.v8622.prev`).

@@ -40,9 +40,11 @@
     const idx=draft.findIndex(x=>x.id===id),ex=draft[idx];if(!ex)return;
     if(flowPhase==='setup'){removeExerciseFromSetup(id);try{if(!$('#orderModal').classList.contains('hidden'))renderOrderModal()}catch{}return}
     const done=Math.min(Number(ex.completedSets)||0,ex.sets.length),total=ex.sets.length,eff=v8630Eff(ex,done);
-    const msg=!done?`¿Quitar ${ex.name} de este entrenamiento?`:done<total?`¿Quitar ${ex.name}? ${eff?`Las ${eff} serie${eff===1?'':'s'} que ya hiciste se guardan; `:''}solo se quitan las pendientes.`:`${ex.name} ya está terminado. ¿Borrarlo con sus ${eff||done} serie${(eff||done)===1?'':'s'} registrada${(eff||done)===1?'':'s'}?`;
+    // 8.6.32: en pleno entreno nunca se borra una serie ya hecha. Terminado → no se puede quitar; a medias → solo pendientes.
+    if(done>=total){toast(`${ex.name} ya está hecho: sus series quedan guardadas.`);return}
+    const msg=!done?`¿Quitar ${ex.name} de este entrenamiento?`:`¿Quitar lo que falta de ${ex.name}? Las ${done} serie${done===1?'':'s'} que ya hiciste quedan guardadas.`;
     if(!confirm(msg))return;
-    if(done&&done<total){ex.sets=ex.sets.slice(0,done);ex.plannedSets=eff}
+    if(done){ex.sets=ex.sets.slice(0,done);ex.plannedSets=eff}
     else draft.splice(idx,1);
     v8630FixActive();v8630Refresh();toast(`${ex.name} quitado.`);
   }
@@ -137,7 +139,7 @@
       items.forEach((it,i)=>{const ex=draft[i];if(!ex)return;
         // 8.6.31: el conteo «x/y series» ya no suma los calentamientos (antes 3 efectivas + 2 de calentamiento salían como 5).
         try{const tag=it.querySelector('.exercise-status');if(tag&&/^\d+\/\d+ series$/.test(tag.textContent.trim())){const n=Math.min(Number(ex.completedSets)||0,ex.sets.length),ws=ex.sets.filter(st=>setType(st)==='warmup'),wd=ex.sets.slice(0,n).filter(st=>setType(st)==='warmup').length,tot=ex.sets.length-ws.length,dn=n-wd;tag.textContent=`${dn}/${tot} series`+(ws.length&&wd<ws.length?` · ${ws.length-wd} de calentamiento`:'')}}catch{}
-const full=flowPhase!=='setup'&&(Number(ex.completedSets)||0)>=ex.sets.length;it.insertAdjacentHTML('beforeend',`<div class="v8630-acts">${full?'':`<button class="secondary" data-v8630-rep="${ex.id}">⇄ Cambiar</button>`}<button class="secondary danger" data-v8630-del="${ex.id}">🗑 Quitar</button></div>`)});
+const full=flowPhase!=='setup'&&(Number(ex.completedSets)||0)>=ex.sets.length;it.insertAdjacentHTML('beforeend',`<div class="v8630-acts">${full?'':`<button class="secondary" data-v8630-rep="${ex.id}">⇄ Cambiar</button>`}${full?'<span class="v8630-saved">✓ Hecho · guardado</span>':`<button class="secondary danger" data-v8630-del="${ex.id}">${flowPhase!=='setup'&&(Number(ex.completedSets)||0)>0?'🗑 Quitar lo que falta':'🗑 Quitar'}</button>`}</div>`)});
       $('#orderContent').insertAdjacentHTML('beforeend',`<button class="primary v8630-add" data-v8630-add>＋ Agregar ejercicio</button>`);
       const h=$('#orderModal .modal-head h2'),s=$('#orderModal .modal-head .small');
       if(h)h.textContent='Ejercicios del entrenamiento';
@@ -150,6 +152,14 @@ const full=flowPhase!=='setup'&&(Number(ex.completedSets)||0)>=ex.sets.length;it
     if(e.target.closest('[data-v8630-add]')){e.stopImmediatePropagation();openCatalogModal(flowPhase==='setup'?'setup':'workout')}
   },true);
 
+  // «Quitar próximo ejercicio» de las opciones (y cualquier otro que llame a removeExerciseDuringWorkout) pasa por
+  // v8630Remove: conserva las series hechas (antes las borraba con un aviso).
+  removeExerciseDuringWorkout=function(){
+    syncActiveIndices();
+    const id=flowPhase==='rest'?(pendingNext?.exerciseId||findNextPendingExercise()?.id):activeExerciseId;
+    if(!draft.some(x=>x.id===id)){toast('No queda un ejercicio pendiente para quitar.');return}
+    v8630Remove(id);
+  };
   // Tarjetas de la rutina antes de empezar: «⇄ Cambiar».
   const _v8630RenderDraft=renderDraft;
   renderDraft=function(){
@@ -172,6 +182,7 @@ const full=flowPhase!=='setup'&&(Number(ex.completedSets)||0)>=ex.sets.length;it
   document.head.insertAdjacentHTML('beforeend',`<style>
     #orderContent .v8630-acts{grid-column:1/-1;display:flex;gap:8px;margin-top:2px}
     #orderContent .v8630-acts button{flex:1;padding:7px 9px;font-size:13px;min-height:38px}
+    .v8630-saved{flex:1;text-align:center;font-size:13px;color:var(--green2);padding:9px;border:1px solid var(--line);border-radius:12px}
     .v8630-add{width:100%;margin-top:4px;min-height:46px}
     .v8630-new{border:1px dashed var(--green);border-radius:14px;padding:11px;display:grid;gap:9px;margin-bottom:8px}
     .v8630-new-row{display:flex;gap:8px}.v8630-new-row select{flex:1;min-width:0}.v8630-new-row button{flex:0 0 auto}

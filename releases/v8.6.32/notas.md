@@ -1,0 +1,1 @@
+- Progreso protegido: en pleno entreno ya no se puede borrar una serie hecha. Terminado = «✓ Hecho · guardado» sin quitar; a medias = «Quitar lo que falta» (solo pendientes).
