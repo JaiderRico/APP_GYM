@@ -1,0 +1,1 @@
+- En «☰ Ejercicios» el número de series ya no suma los calentamientos (3 series + 2 de calentamiento ya no sale como 5).

@@ -134,7 +134,10 @@
     _v8630RenderOrder.apply(this,arguments);
     try{
       const items=[...$('#orderContent').querySelectorAll(':scope > .order-item')];
-      items.forEach((it,i)=>{const ex=draft[i];if(!ex)return;const full=flowPhase!=='setup'&&(Number(ex.completedSets)||0)>=ex.sets.length;it.insertAdjacentHTML('beforeend',`<div class="v8630-acts">${full?'':`<button class="secondary" data-v8630-rep="${ex.id}">⇄ Cambiar</button>`}<button class="secondary danger" data-v8630-del="${ex.id}">🗑 Quitar</button></div>`)});
+      items.forEach((it,i)=>{const ex=draft[i];if(!ex)return;
+        // 8.6.31: el conteo «x/y series» ya no suma los calentamientos (antes 3 efectivas + 2 de calentamiento salían como 5).
+        try{const tag=it.querySelector('.exercise-status');if(tag&&/^\d+\/\d+ series$/.test(tag.textContent.trim())){const n=Math.min(Number(ex.completedSets)||0,ex.sets.length),ws=ex.sets.filter(st=>setType(st)==='warmup'),wd=ex.sets.slice(0,n).filter(st=>setType(st)==='warmup').length,tot=ex.sets.length-ws.length,dn=n-wd;tag.textContent=`${dn}/${tot} series`+(ws.length&&wd<ws.length?` · ${ws.length-wd} de calentamiento`:'')}}catch{}
+const full=flowPhase!=='setup'&&(Number(ex.completedSets)||0)>=ex.sets.length;it.insertAdjacentHTML('beforeend',`<div class="v8630-acts">${full?'':`<button class="secondary" data-v8630-rep="${ex.id}">⇄ Cambiar</button>`}<button class="secondary danger" data-v8630-del="${ex.id}">🗑 Quitar</button></div>`)});
       $('#orderContent').insertAdjacentHTML('beforeend',`<button class="primary v8630-add" data-v8630-add>＋ Agregar ejercicio</button>`);
       const h=$('#orderModal .modal-head h2'),s=$('#orderModal .modal-head .small');
       if(h)h.textContent='Ejercicios del entrenamiento';

@@ -184,6 +184,8 @@ vale solo cuando Jaider las vuelva a activar.
   `v8630FixActive` mueve la serie en curso / el «Sigue» del descanso al primer pendiente solo si apuntaban a lo tocado.
   Reemplaza (envolviendo) `openCatalogModal`, `renderCatalogList`, `addCatalogExercise`, `renderOrderModal`, `renderDraft`
   y `renderFocus`. No hay claves de datos nuevas.
+  8.6.31: en esa lista el estado «x/y series» cuenta solo series efectivas y aparte «· N de calentamiento» (antes sumaba
+  los calentamientos: 3 + 2 salía como 5).
 - `fuente/v8622_pesar_comida.js` (8.6.22, **solo app de Jaider**; la libre lo trae apagado por `MP_PUBLICA`/`V88_APP`; justo
   antes de `initV7();`, después de v8619): Comida → «⚖️ Pesar comida» (ventana `#v8622`, role=dialog para que v88 la cierre con
   volver). La primera vez fija `data.settings.nutritionGoals` en 2400 kcal / 140 g (copia anterior en `settings.v8622.prev`).
