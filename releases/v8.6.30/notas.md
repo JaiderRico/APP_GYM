@@ -1,0 +1,1 @@
+- En «☰ Ejercicios» ahora puedes agregar, crear, cambiar o quitar ejercicios de la rutina cargada, también en pleno entreno (las series ya hechas se conservan).

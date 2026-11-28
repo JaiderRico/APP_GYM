@@ -173,6 +173,17 @@ vale solo cuando Jaider las vuelva a activar.
   `armar` de mp.py con la base de cada una. Solo Jaider: `Speak.java` pide el foco con `AudioFocusRequest` (API 26+, por
   reflexión, atributos de guía/habla) ~450 ms antes de hablar y lo suelta con `abandonAudioFocusRequest`, para que Spotify y
   similares sí bajen la música; classes7.dex se rearmó cambiando solo los `Speak*.smali`.
+- `fuente/v8630_editar_rutina.js` (8.6.30, **solo app de Jaider**; justo antes de `initV7();`, al final, después de v8627):
+  editar la rutina cargada antes o en pleno entreno. La lista de Orden (`#orderModal`, ahora «☰ Ejercicios») agrega en
+  cada ejercicio «⇄ Cambiar» y «🗑 Quitar» (`.v8630-acts`) y abajo «＋ Agregar ejercicio»; las tarjetas de antes de empezar
+  tienen «⇄ Cambiar». Cambiar usa el catálogo en modo `catalogAddMode='replace'` (`v8630RepId`; sugerencias de
+  `SUBSTITUTIONS` o del mismo grupo arriba). El catálogo ofrece «＋ Crear "…"» si lo buscado no existe (`createCustomExercise`
+  → `data.customExercises`). `v8630Remove`: sin series hechas lo saca; con algunas hechas deja las hechas
+  (`plannedSets` = efectivas hechas) y quita las pendientes; terminado → pregunta si borrarlo. `v8630Replace`: sin series
+  hechas lo reemplaza en su lugar (mismo id); con series hechas el nuevo entra justo después con las efectivas que faltaban.
+  `v8630FixActive` mueve la serie en curso / el «Sigue» del descanso al primer pendiente solo si apuntaban a lo tocado.
+  Reemplaza (envolviendo) `openCatalogModal`, `renderCatalogList`, `addCatalogExercise`, `renderOrderModal`, `renderDraft`
+  y `renderFocus`. No hay claves de datos nuevas.
 - `fuente/v8622_pesar_comida.js` (8.6.22, **solo app de Jaider**; la libre lo trae apagado por `MP_PUBLICA`/`V88_APP`; justo
   antes de `initV7();`, después de v8619): Comida → «⚖️ Pesar comida» (ventana `#v8622`, role=dialog para que v88 la cierre con
   volver). La primera vez fija `data.settings.nutritionGoals` en 2400 kcal / 140 g (copia anterior en `settings.v8622.prev`).
